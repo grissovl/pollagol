@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(npm *)",
+      "PowerShell(Get-ChildItem C:\\\\Users\\\\gvloc\\\\pollagol-app | ForEach-Object { Move-Item $_.FullName C:\\\\Users\\\\gvloc\\\\pollagol\\\\ -Force }; Write-Host \"Done\")",
+      "Bash(git init *)",
+      "Bash(git branch *)",
+      "Bash(git add *)"
+    ]
+  }
+}
