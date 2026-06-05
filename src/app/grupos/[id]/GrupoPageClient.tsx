@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Clipboard, Check, Users, DollarSign, CheckCircle2, Clock,
-  Trash2, UserX, Swords, Trophy,
+  Trash2, UserX, Swords, Trophy, ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -17,14 +17,18 @@ import {
 } from '@/app/actions/grupo-detail'
 import { calcularPuntajes } from '@/app/actions/scoring'
 import JugarTab from './JugarTab'
+import ApuestasTab from './ApuestasTab'
+import PuntuacionTab from './PuntuacionTab'
 import TeamFlag from '@/components/ui/TeamFlag'
+import { WC2026_TEAMS } from './constants'
+import { saveSpecialResults } from '@/app/actions/grupo-detail'
 export type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
-  MatchData, PredictionData, LeaderboardEntry,
+  MatchData, PredictionData, LeaderboardEntry, SpecialBet,
 } from './types'
 import type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
-  MatchData, PredictionData, LeaderboardEntry,
+  MatchData, PredictionData, LeaderboardEntry, SpecialBet,
 } from './types'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -40,6 +44,8 @@ interface Props {
   groupMatches: MatchData[]
   myPredictions: PredictionData[]
   leaderboard: LeaderboardEntry[]
+  mySpecialBets: SpecialBet[]
+  allSpecialBets: SpecialBet[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -244,7 +250,8 @@ function AdminInfoTab({
   const accepted = members.filter((m) => m.status === 'accepted')
   const paid = members.filter((m) => m.status === 'accepted' && m.paid)
   const pending = members.filter((m) => m.status === 'pending')
-  const acumulado = accepted.length * rules.bet_amount
+  const paidPlaying = paid.filter((m) => group.owner_plays || m.user_id !== group.owner_id)
+  const acumulado = paidPlaying.length * rules.bet_amount
 
   const handleRecalcular = () => {
     setCalcMsg(null)
@@ -699,10 +706,11 @@ function ParticipantesTab({
 // ── PartidosTab (admin) ───────────────────────────────────────────────────────
 
 function PartidosTab({
-  group, allMatches,
+  group, allMatches, rules,
 }: {
   group: GrupoData
   allMatches: MatchData[]
+  rules: RulesData
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -711,12 +719,40 @@ function PartidosTab({
   )
   const [msg, setMsg] = useState<{ ok?: boolean; text: string } | null>(null)
 
+  // Special results state
+  const [showSpecialRes, setShowSpecialRes] = useState(false)
+  const [spChampion, setSpChampion] = useState(rules.special_champion ?? '')
+  const [spGoldenBall, setSpGoldenBall] = useState(rules.special_golden_ball ?? '')
+  const [spGoldenBoot, setSpGoldenBoot] = useState(rules.special_golden_boot ?? '')
+  const [spGoldenGlove, setSpGoldenGlove] = useState(rules.special_golden_glove ?? '')
+  const [specialMsg, setSpecialMsg] = useState<{ ok?: boolean; text: string } | null>(null)
+
+  const handleSaveSpecial = () => {
+    setSpecialMsg(null)
+    startTransition(async () => {
+      const res = await saveSpecialResults(
+        group.id,
+        spChampion || null,
+        spGoldenBall || null,
+        spGoldenBoot || null,
+        spGoldenGlove || null,
+      )
+      if (res.error) {
+        setSpecialMsg({ text: res.error })
+      } else {
+        setSpecialMsg({ ok: true, text: 'Resultados guardados · puntajes recalculados' })
+        router.refresh()
+      }
+    })
+  }
+
   // Result entry state — all past group matches (with or without result, always editable)
   const now = new Date()
   const pastGroupMatches = allMatches.filter(
     (m) => m.in_group && new Date(m.scheduled_at) < now,
   )
   const [showResultados, setShowResultados] = useState(pastGroupMatches.length > 0)
+  const [showPartidos, setShowPartidos] = useState(false)
   const [scores, setScores] = useState<Record<number, { home: string; away: string }>>(() => {
     const init: Record<number, { home: string; away: string }> = {}
     pastGroupMatches.forEach((m) => {
@@ -795,80 +831,8 @@ function PartidosTab({
 
   return (
     <div className="space-y-6">
-      {/* ── Partidos del grupo ── */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-gray-700">Partidos del grupo</h3>
-          <div className="flex gap-2">
-            <button className="text-xs text-blue-600 hover:underline" onClick={() => setSelectedIds(new Set(allMatches.map((m) => m.id)))}>
-              Seleccionar todos
-            </button>
-            <button className="text-xs text-gray-500 hover:underline" onClick={() => setSelectedIds(new Set())}>
-              Ninguno
-            </button>
-          </div>
-        </div>
-        <p className="text-xs text-gray-500">
-          <span className="font-semibold text-gray-700">{selectedIds.size}</span> de {allMatches.length} partidos habilitados
-        </p>
-
-        <div className="space-y-3" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
-          {sortedPhases.map((phase) => {
-            const ms = matchesByPhase[phase]
-            const allSel = ms.every((m) => selectedIds.has(m.id))
-            const someSel = ms.some((m) => selectedIds.has(m.id))
-            return (
-              <div key={phase} className="overflow-hidden rounded-lg border border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => togglePhase(phase)}
-                  className="flex w-full items-center justify-between bg-gray-50 px-4 py-2.5 text-left hover:bg-gray-100"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={`flex h-4 w-4 items-center justify-center rounded border-2 text-xs text-white ${allSel ? 'border-blue-600 bg-blue-600' : someSel ? 'border-blue-400 bg-blue-100' : 'border-gray-300 bg-white'}`}>
-                      {allSel ? '✓' : someSel ? '−' : ''}
-                    </div>
-                    <span className="text-sm font-semibold text-gray-800">{phaseLabels[phase] ?? phase}</span>
-                  </div>
-                  <span className="text-xs text-gray-500">{ms.filter((m) => selectedIds.has(m.id)).length}/{ms.length}</span>
-                </button>
-                <ul className="divide-y divide-gray-100">
-                  {ms.map((match) => (
-                    <li key={match.id}>
-                      <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(match.id)}
-                          onChange={() => toggleMatch(match.id)}
-                          className="h-4 w-4 rounded border-gray-300 text-blue-600"
-                        />
-                        <span className="flex flex-1 items-center gap-1.5 text-sm text-gray-700">
-                          {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
-                          {match.home_team?.name ?? 'TBD'}
-                          <span className="text-gray-400">vs</span>
-                          {match.away_team?.name ?? 'TBD'}
-                          {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
-                          {match.group_name && <span className="text-xs text-gray-400">(Gr. {match.group_name})</span>}
-                        </span>
-                        <span className="shrink-0 text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )
-          })}
-        </div>
-
-        {msg && <p className={`text-sm ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
-
-        <Button onClick={handleSave} disabled={isPending} className="w-full sm:w-auto">
-          {isPending ? 'Guardando...' : 'Guardar cambios'}
-        </Button>
-      </div>
-
       {/* ── Ingresar resultados ── */}
-      <div className="border-t border-gray-200 pt-6">
+      <div>
         <button
           type="button"
           onClick={() => setShowResultados((v) => !v)}
@@ -955,6 +919,162 @@ function PartidosTab({
                 )
               })
             )}
+          </div>
+        )}
+      </div>
+
+      {/* ── Resultados especiales ── */}
+      <div className="border-t border-gray-200 pt-6">
+        <button
+          type="button"
+          onClick={() => setShowSpecialRes((v) => !v)}
+          className="flex w-full items-center justify-between text-sm font-semibold text-gray-700 hover:text-gray-900"
+        >
+          <span>Resultados especiales</span>
+          <ChevronDown
+            className={`h-4 w-4 text-gray-400 transition-transform ${showSpecialRes ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        {showSpecialRes && (
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <span className="w-36 shrink-0 text-sm text-gray-600">🏆 Campeón</span>
+              <select
+                value={spChampion}
+                onChange={(e) => setSpChampion(e.target.value)}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              >
+                <option value="">Sin resultado</option>
+                {WC2026_TEAMS.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-36 shrink-0 text-sm text-gray-600">⚽ Balón de Oro</span>
+              <input
+                type="text"
+                value={spGoldenBall}
+                onChange={(e) => setSpGoldenBall(e.target.value)}
+                placeholder="Nombre del jugador"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-36 shrink-0 text-sm text-gray-600">👟 Bota de Oro</span>
+              <input
+                type="text"
+                value={spGoldenBoot}
+                onChange={(e) => setSpGoldenBoot(e.target.value)}
+                placeholder="Nombre del jugador"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="w-36 shrink-0 text-sm text-gray-600">🧤 Guante de Oro</span>
+              <input
+                type="text"
+                value={spGoldenGlove}
+                onChange={(e) => setSpGoldenGlove(e.target.value)}
+                placeholder="Nombre del jugador"
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            {specialMsg && (
+              <p className={`text-sm ${specialMsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+                {specialMsg.text}
+              </p>
+            )}
+            <Button onClick={handleSaveSpecial} disabled={isPending} className="w-full sm:w-auto">
+              {isPending ? 'Guardando...' : 'Guardar resultados'}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Partidos del grupo ── */}
+      <div className="border-t border-gray-200 pt-6">
+        <button
+          type="button"
+          onClick={() => setShowPartidos((v) => !v)}
+          className="flex w-full items-center justify-between text-sm font-semibold text-gray-700 hover:text-gray-900"
+        >
+          <span>
+            Partidos del grupo
+            <span className="ml-2 text-xs font-normal text-gray-500">
+              ({selectedIds.size} de {allMatches.length} habilitados)
+            </span>
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 text-gray-400 transition-transform ${showPartidos ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        {showPartidos && (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-end gap-2">
+              <button className="text-xs text-blue-600 hover:underline" onClick={() => setSelectedIds(new Set(allMatches.map((m) => m.id)))}>
+                Seleccionar todos
+              </button>
+              <button className="text-xs text-gray-500 hover:underline" onClick={() => setSelectedIds(new Set())}>
+                Ninguno
+              </button>
+            </div>
+
+            <div className="space-y-3" style={{ maxHeight: '55vh', overflowY: 'auto' }}>
+              {sortedPhases.map((phase) => {
+                const ms = matchesByPhase[phase]
+                const allSel = ms.every((m) => selectedIds.has(m.id))
+                const someSel = ms.some((m) => selectedIds.has(m.id))
+                return (
+                  <div key={phase} className="overflow-hidden rounded-lg border border-gray-200">
+                    <button
+                      type="button"
+                      onClick={() => togglePhase(phase)}
+                      className="flex w-full items-center justify-between bg-gray-50 px-4 py-2.5 text-left hover:bg-gray-100"
+                    >
+                      <div className="flex items-center gap-2">
+                        <div className={`flex h-4 w-4 items-center justify-center rounded border-2 text-xs text-white ${allSel ? 'border-blue-600 bg-blue-600' : someSel ? 'border-blue-400 bg-blue-100' : 'border-gray-300 bg-white'}`}>
+                          {allSel ? '✓' : someSel ? '−' : ''}
+                        </div>
+                        <span className="text-sm font-semibold text-gray-800">{phaseLabels[phase] ?? phase}</span>
+                      </div>
+                      <span className="text-xs text-gray-500">{ms.filter((m) => selectedIds.has(m.id)).length}/{ms.length}</span>
+                    </button>
+                    <ul className="divide-y divide-gray-100">
+                      {ms.map((match) => (
+                        <li key={match.id}>
+                          <label className="flex cursor-pointer items-center gap-3 px-4 py-2.5 hover:bg-gray-50">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(match.id)}
+                              onChange={() => toggleMatch(match.id)}
+                              className="h-4 w-4 rounded border-gray-300 text-blue-600"
+                            />
+                            <span className="flex flex-1 items-center gap-1.5 text-sm text-gray-700">
+                              {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                              {match.home_team?.name ?? 'TBD'}
+                              <span className="text-gray-400">vs</span>
+                              {match.away_team?.name ?? 'TBD'}
+                              {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
+                              {match.group_name && <span className="text-xs text-gray-400">(Gr. {match.group_name})</span>}
+                            </span>
+                            <span className="shrink-0 text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</span>
+                          </label>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )
+              })}
+            </div>
+
+            {msg && <p className={`text-sm ${msg.ok ? 'text-green-600' : 'text-red-600'}`}>{msg.text}</p>}
+
+            <Button onClick={handleSave} disabled={isPending} className="w-full sm:w-auto">
+              {isPending ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
           </div>
         )}
       </div>
@@ -1064,16 +1184,20 @@ function PosicionesTab({ leaderboard, userId }: { leaderboard: LeaderboardEntry[
 export default function GrupoPageClient({
   group, rules, myMembership, isOwner, userId,
   members, allMatches, groupMatches, myPredictions, leaderboard,
+  mySpecialBets, allSpecialBets,
 }: Props) {
   const memberStatus = myMembership?.status ?? null
   const isAccepted = memberStatus === 'accepted'
 
+  const isPaid = isOwner || (myMembership?.paid ?? false)
+
   const adminTabs = [
-    'Info', 'Configuración', 'Participantes', 'Partidos',
+    'Info', 'Configuración', 'Participantes', 'Partidos', 'Predicciones únicas',
     ...(group.owner_plays ? ['Jugar'] : []),
+    'Cómo se puntúa',
     'Ranking',
   ]
-  const participantTabs = ['Info', 'Jugar', 'Tabla de Posiciones']
+  const participantTabs = ['Info', 'Jugar', 'Predicciones únicas', 'Cómo se puntúa', 'Tabla de Posiciones']
 
   const tabs = isOwner ? adminTabs : participantTabs
   const [activeTab, setActiveTab] = useState<string>(tabs[0])
@@ -1165,14 +1289,31 @@ export default function GrupoPageClient({
             <ParticipantesTab group={group} members={members} />
           )}
           {isOwner && activeTab === 'Partidos' && (
-            <PartidosTab group={group} allMatches={allMatches} />
+            <PartidosTab group={group} allMatches={allMatches} rules={rules} />
+          )}
+          {isOwner && activeTab === 'Predicciones únicas' && (
+            <ApuestasTab
+              groupId={group.id}
+              userId={userId}
+              isOwner
+              ownerPlays={group.owner_plays}
+              paid={isPaid}
+              myBets={mySpecialBets}
+              allBets={allSpecialBets}
+              members={members}
+              rules={rules}
+            />
           )}
           {isOwner && activeTab === 'Jugar' && (
             <JugarTab
               groupId={group.id}
               matches={groupMatches}
               initialPredictions={myPredictions}
+              paid={isPaid}
             />
+          )}
+          {isOwner && activeTab === 'Cómo se puntúa' && (
+            <PuntuacionTab rules={rules} />
           )}
           {isOwner && activeTab === 'Ranking' && (
             <PosicionesTab leaderboard={leaderboard} userId={userId} />
@@ -1187,7 +1328,24 @@ export default function GrupoPageClient({
               groupId={group.id}
               matches={groupMatches}
               initialPredictions={myPredictions}
+              paid={isPaid}
             />
+          )}
+          {!isOwner && activeTab === 'Predicciones únicas' && (
+            <ApuestasTab
+              groupId={group.id}
+              userId={userId}
+              isOwner={false}
+              ownerPlays={group.owner_plays}
+              paid={isPaid}
+              myBets={mySpecialBets}
+              allBets={[]}
+              members={members}
+              rules={rules}
+            />
+          )}
+          {!isOwner && activeTab === 'Cómo se puntúa' && (
+            <PuntuacionTab rules={rules} />
           )}
           {!isOwner && activeTab === 'Tabla de Posiciones' && (
             <PosicionesTab leaderboard={leaderboard} userId={userId} />

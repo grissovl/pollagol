@@ -238,6 +238,89 @@ export async function saveMatchResult(
   }
 }
 
+export async function upsertSpecialBet(
+  groupId: string,
+  category: string,
+  teamOrPlayer: string,
+): Promise<{ error?: string }> {
+  const supabase = createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return { error: 'No autenticado' }
+
+  const LOCK_DATE = new Date('2026-06-11T18:45:00Z')
+  if (new Date() >= LOCK_DATE) return { error: 'Las apuestas especiales están bloqueadas' }
+
+  // Check if row already exists to avoid onConflict constraint name issues
+  const { data: existing, error: selectError } = await supabase
+    .from('special_bets')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .eq('category', category)
+    .maybeSingle()
+
+  if (selectError) {
+    console.error('[upsertSpecialBet] select error:', selectError)
+    return { error: errMsg(selectError) }
+  }
+
+  if (existing) {
+    const { error } = await supabase
+      .from('special_bets')
+      .update({ team_or_player: teamOrPlayer, updated_at: new Date().toISOString() })
+      .eq('id', (existing as { id: string }).id)
+    if (error) {
+      console.error('[upsertSpecialBet] update error:', error)
+      return { error: errMsg(error) }
+    }
+  } else {
+    const { error } = await supabase.from('special_bets').insert({
+      group_id: groupId,
+      user_id: user.id,
+      category,
+      team_or_player: teamOrPlayer,
+    })
+    if (error) {
+      console.error('[upsertSpecialBet] insert error:', error)
+      return { error: errMsg(error) }
+    }
+  }
+
+  return {}
+}
+
+export async function saveSpecialResults(
+  groupId: string,
+  special_champion: string | null,
+  special_golden_ball: string | null,
+  special_golden_boot: string | null,
+  special_golden_glove: string | null,
+): Promise<{ error?: string }> {
+  try {
+    const { supabase } = await assertOwner(groupId)
+    const { error } = await supabase
+      .from('special_results')
+      .upsert(
+        {
+          group_id: groupId,
+          champion: special_champion,
+          golden_ball: special_golden_ball,
+          golden_boot: special_golden_boot,
+          golden_glove: special_golden_glove,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'group_id' },
+      )
+    if (error) return { error: errMsg(error) }
+    revalidatePath(`/grupos/${groupId}`)
+    return {}
+  } catch (e) {
+    return { error: errMsg(e) }
+  }
+}
+
 export async function upsertPrediction(
   groupId: string,
   matchId: number,

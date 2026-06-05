@@ -11,6 +11,7 @@ interface Props {
   groupId: string
   matches: MatchData[]
   initialPredictions: PredictionData[]
+  paid: boolean
 }
 
 type PredState = {
@@ -59,7 +60,7 @@ function isMatchFinished(match: MatchData): boolean {
   return match.status === 'finished' || (match.home_score !== null && match.away_score !== null)
 }
 
-export default function JugarTab({ groupId, matches, initialPredictions }: Props) {
+export default function JugarTab({ groupId, matches, initialPredictions, paid }: Props) {
   const [autosave, setAutosave] = useState(true)
   const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('all')
 
@@ -141,7 +142,7 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
       [matchId]: { ...prev[matchId], [field]: val, error: null },
     }))
 
-    if (!autosave) return
+    if (!paid || !autosave) return
 
     const existing = timeouts.current.get(matchId)
     if (existing) clearTimeout(existing)
@@ -182,6 +183,15 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
 
   return (
     <div className="space-y-4">
+      {/* Payment pending banner */}
+      {!paid && (
+        <div className="flex items-start gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-4 py-3 text-sm text-yellow-800">
+          <span className="mt-0.5 shrink-0">⚠️</span>
+          <span>
+            <strong>Tu pago está pendiente.</strong> Solo puedes ver las predicciones cuando el admin confirme tu pago.
+          </span>
+        </div>
+      )}
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {/* Filter buttons */}
@@ -235,7 +245,7 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
                   const pred = preds[match.id]
                   const locked = isLocked(match.scheduled_at)
                   const finished = isMatchFinished(match)
-                  const isDisabled = locked || finished
+                  const isDisabled = !paid || locked || finished
 
                   const homeName = match.home_team?.name ?? 'TBD'
                   const awayName = match.away_team?.name ?? 'TBD'

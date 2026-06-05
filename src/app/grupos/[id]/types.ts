@@ -22,6 +22,10 @@ export type RulesData = {
   prize_pct_1st: number
   prize_pct_2nd: number
   prize_pct_3rd: number
+  special_champion?: string | null
+  special_golden_ball?: string | null
+  special_golden_boot?: string | null
+  special_golden_glove?: string | null
 }
 
 export type MyMembership = {
@@ -72,4 +76,13 @@ export type LeaderboardEntry = {
   pts_goal: number
   pts_unique: number
   pts_bonus: number
+}
+
+export type SpecialBet = {
+  id: string
+  group_id: string
+  user_id: string
+  category: 'champion' | 'golden_ball' | 'golden_boot' | 'golden_glove'
+  team_or_player: string
+  locked: boolean
 }

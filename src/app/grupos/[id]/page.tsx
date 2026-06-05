@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import GrupoPageClient from './GrupoPageClient'
 import type {
   GrupoData, RulesData, MemberWithProfile, MatchData,
-  PredictionData, LeaderboardEntry, MyMembership,
+  PredictionData, LeaderboardEntry, MyMembership, SpecialBet,
 } from './types'
 
 interface Props {
@@ -58,6 +58,28 @@ export default async function GrupoDetailPage({ params }: Props) {
     pts_r32_bonus: 10, pts_r16_bonus: 8, pts_r8_bonus: 4, pts_r4_bonus: 2, pts_final_bonus: 5,
     bet_amount: 0, prize_pct_1st: 70, prize_pct_2nd: 20, prize_pct_3rd: 10,
   }) as RulesData
+
+  // ── Special results ────────────────────────────────────────────
+  const { data: spRaw } = await supabase
+    .from('special_results')
+    .select('champion, golden_ball, golden_boot, golden_glove')
+    .eq('group_id', params.id)
+    .maybeSingle()
+
+  if (spRaw) {
+    const sp = spRaw as {
+      champion: string | null
+      golden_ball: string | null
+      golden_boot: string | null
+      golden_glove: string | null
+    }
+    Object.assign(rules, {
+      special_champion: sp.champion,
+      special_golden_ball: sp.golden_ball,
+      special_golden_boot: sp.golden_boot,
+      special_golden_glove: sp.golden_glove,
+    })
+  }
 
   // ── User membership ────────────────────────────────────────────
   const { data: myMembershipRaw } = await supabase
@@ -151,6 +173,21 @@ export default async function GrupoDetailPage({ params }: Props) {
     myPredictions = (predsRaw ?? []) as PredictionData[]
   }
 
+  // ── Special bets ───────────────────────────────────────────────
+  let mySpecialBets: SpecialBet[] = []
+  let allSpecialBets: SpecialBet[] = []
+  let allBetsForLeaderboard: SpecialBet[] = []
+
+  if (isAccepted || isOwner) {
+    const { data: betsRaw } = await supabase
+      .from('special_bets')
+      .select('id, group_id, user_id, category, team_or_player, locked')
+      .eq('group_id', params.id)
+    allBetsForLeaderboard = (betsRaw ?? []) as SpecialBet[]
+    mySpecialBets = allBetsForLeaderboard.filter((b) => b.user_id === user.id)
+    if (isOwner) allSpecialBets = allBetsForLeaderboard
+  }
+
   // ── Leaderboard ────────────────────────────────────────────────
   let leaderboard: LeaderboardEntry[] = []
   if (isAccepted || isOwner) {
@@ -183,6 +220,28 @@ export default async function GrupoDetailPage({ params }: Props) {
       userTotals[uid].pts_unique += s.pts_unique
       userTotals[uid].pts_bonus += s.pts_bonus
       userTotals[uid].total += s.total
+    }
+
+    // Add special bet points to userTotals
+    const SPECIAL_PTS: Record<string, number> = {
+      champion: 20, golden_ball: 15, golden_boot: 15, golden_glove: 10,
+    }
+    const specialResults: Record<string, string | null | undefined> = {
+      champion: rules.special_champion,
+      golden_ball: rules.special_golden_ball,
+      golden_boot: rules.special_golden_boot,
+      golden_glove: rules.special_golden_glove,
+    }
+    for (const bet of allBetsForLeaderboard) {
+      const result = specialResults[bet.category]
+      if (!result) continue
+      if (bet.team_or_player.trim().toLowerCase() !== result.trim().toLowerCase()) continue
+      const pts = SPECIAL_PTS[bet.category] ?? 0
+      if (!userTotals[bet.user_id]) {
+        userTotals[bet.user_id] = { pts_exact: 0, pts_winner: 0, pts_goal: 0, pts_unique: 0, pts_bonus: 0, total: 0 }
+      }
+      userTotals[bet.user_id].pts_bonus += pts
+      userTotals[bet.user_id].total += pts
     }
 
     leaderboard = members
@@ -222,6 +281,8 @@ export default async function GrupoDetailPage({ params }: Props) {
         groupMatches={groupMatches}
         myPredictions={myPredictions}
         leaderboard={leaderboard}
+        mySpecialBets={mySpecialBets}
+        allSpecialBets={allSpecialBets}
       />
     </div>
   )
