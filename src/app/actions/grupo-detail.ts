@@ -202,11 +202,15 @@ export async function saveMatchResult(
 ): Promise<{ error?: string }> {
   try {
     const { supabase } = await assertOwner(groupId)
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('matches')
       .update({ home_score: homeScore, away_score: awayScore, status: 'finished' })
       .eq('id', matchId)
+      .select('id')
     if (error) return { error: errMsg(error) }
+    if (!data || data.length === 0) {
+      return { error: 'No se pudo actualizar el partido. Verifica que existe la policy RLS "matches_update_admin" en Supabase.' }
+    }
     const calc = await calcularPuntajes(groupId)
     if (calc.error) return { error: calc.error }
     revalidatePath(`/grupos/${groupId}`)

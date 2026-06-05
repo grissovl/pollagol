@@ -637,16 +637,19 @@ function PartidosTab({
   )
   const [msg, setMsg] = useState<{ ok?: boolean; text: string } | null>(null)
 
-  // Result entry state — only past group matches that still have no result
+  // Result entry state — all past group matches (with or without result, always editable)
   const now = new Date()
-  const pendingResultMatches = allMatches.filter(
-    (m) => m.in_group && new Date(m.scheduled_at) < now && m.home_score === null,
+  const pastGroupMatches = allMatches.filter(
+    (m) => m.in_group && new Date(m.scheduled_at) < now,
   )
-  const [showResultados, setShowResultados] = useState(pendingResultMatches.length > 0)
+  const [showResultados, setShowResultados] = useState(pastGroupMatches.length > 0)
   const [scores, setScores] = useState<Record<number, { home: string; away: string }>>(() => {
     const init: Record<number, { home: string; away: string }> = {}
-    pendingResultMatches.forEach((m) => {
-      init[m.id] = { home: '', away: '' }
+    pastGroupMatches.forEach((m) => {
+      init[m.id] = {
+        home: m.home_score != null ? String(m.home_score) : '',
+        away: m.away_score != null ? String(m.away_score) : '',
+      }
     })
     return init
   })
@@ -799,9 +802,9 @@ function PartidosTab({
         >
           <span>
             Ingresar resultados
-            {pendingResultMatches.length > 0 && (
+            {pastGroupMatches.length > 0 && (
               <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                {pendingResultMatches.length} pendiente{pendingResultMatches.length > 1 ? 's' : ''}
+                {pastGroupMatches.length} pendiente{pastGroupMatches.length > 1 ? 's' : ''}
               </span>
             )}
           </span>
@@ -810,10 +813,10 @@ function PartidosTab({
 
         {showResultados && (
           <div className="mt-3 space-y-3">
-            {pendingResultMatches.length === 0 ? (
+            {pastGroupMatches.length === 0 ? (
               <p className="text-sm text-gray-400">No hay partidos pasados sin resultado.</p>
             ) : (
-              pendingResultMatches.map((match) => {
+              pastGroupMatches.map((match) => {
                 const s = scores[match.id] ?? { home: '', away: '' }
                 const mmsg = matchMsgs[match.id]
                 return (
@@ -991,7 +994,7 @@ export default function GrupoPageClient({
   const memberStatus = myMembership?.status ?? null
   const isAccepted = memberStatus === 'accepted'
 
-  const adminTabs = ['Info', 'Configuración', 'Participantes', 'Partidos', 'Jugar'] as const
+  const adminTabs = ['Info', 'Configuración', 'Participantes', 'Partidos', 'Jugar', 'Ranking'] as const
   const participantTabs = ['Info', 'Jugar', 'Tabla de Posiciones'] as const
 
   const tabs = isOwner ? adminTabs : participantTabs
@@ -1092,6 +1095,9 @@ export default function GrupoPageClient({
               matches={groupMatches}
               initialPredictions={myPredictions}
             />
+          )}
+          {isOwner && activeTab === 'Ranking' && (
+            <PosicionesTab leaderboard={leaderboard} userId={userId} />
           )}
 
           {/* Participant tabs */}

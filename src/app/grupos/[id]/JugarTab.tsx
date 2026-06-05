@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Loader2, Lock } from 'lucide-react'
 import { upsertPrediction } from '@/app/actions/grupo-detail'
 import TeamFlag from '@/components/ui/TeamFlag'
+import { createClient } from '@/lib/supabase/client'
 import type { MatchData, PredictionData } from './types'
 
 interface Props {
@@ -79,6 +80,37 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
 
   const [preds, setPreds] = useState<Record<number, PredState>>(initMap)
   const timeouts = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map())
+
+  // On mount: fetch fresh predictions from Supabase to override stale server props
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('predictions')
+        .select('match_id, home_score_pred, away_score_pred, locked')
+        .eq('group_id', groupId)
+        .eq('user_id', user.id)
+        .then(({ data }) => {
+          if (!data) return
+          setPreds((prev) => {
+            const next = { ...prev }
+            for (const p of data as PredictionData[]) {
+              if (next[p.match_id]) {
+                next[p.match_id] = {
+                  ...next[p.match_id],
+                  home: p.home_score_pred?.toString() ?? '',
+                  away: p.away_score_pred?.toString() ?? '',
+                  savedAt: Date.now(),
+                }
+              }
+            }
+            return next
+          })
+        })
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const save = useCallback(
     async (matchId: number, home: string, away: string) => {
