@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Loader2, Lock } from 'lucide-react'
 import { upsertPrediction } from '@/app/actions/grupo-detail'
+import TeamFlag from '@/components/ui/TeamFlag'
 import type { MatchData, PredictionData } from './types'
 
 interface Props {
@@ -204,9 +205,7 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
                   const finished = isMatchFinished(match)
                   const isDisabled = locked || finished
 
-                  const homeFlag = match.home_team?.flag_emoji ?? '🏳'
                   const homeName = match.home_team?.name ?? 'TBD'
-                  const awayFlag = match.away_team?.flag_emoji ?? '🏳'
                   const awayName = match.away_team?.name ?? 'TBD'
 
                   return (
@@ -229,8 +228,9 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
                       <div className="flex items-center gap-3">
                         {/* Home */}
                         <div className="flex min-w-0 flex-1 flex-col items-end gap-1">
-                          <span className="truncate text-sm font-medium text-gray-800">
-                            {homeFlag} {homeName}
+                          <span className="flex items-center justify-end gap-1.5 text-sm font-medium text-gray-800">
+                            <span className="truncate">{homeName}</span>
+                            {match.home_team && <TeamFlag teamName={homeName} size="md" />}
                           </span>
                           {finished && match.home_score !== null && (
                             <span className="text-xs text-gray-400">Real: {match.home_score}</span>
@@ -264,8 +264,9 @@ export default function JugarTab({ groupId, matches, initialPredictions }: Props
 
                         {/* Away */}
                         <div className="flex min-w-0 flex-1 flex-col items-start gap-1">
-                          <span className="truncate text-sm font-medium text-gray-800">
-                            {awayFlag} {awayName}
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-gray-800">
+                            {match.away_team && <TeamFlag teamName={awayName} size="md" />}
+                            <span className="truncate">{awayName}</span>
                           </span>
                           {finished && match.away_score !== null && (
                             <span className="text-xs text-gray-400">Real: {match.away_score}</span>

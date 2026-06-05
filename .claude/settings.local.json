@@ -21,7 +21,8 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
       "Bash(curl -Ls -o /tmp/resp.txt -w \"%{http_code}\" http://localhost:3003/grupos/test-id)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(npm install *)"
     ]
   }
 }

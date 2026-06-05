@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Loader2, Trophy, Swords, CheckSquare, Square
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { createGroup, type GroupRulesInput } from '@/app/actions/groups'
+import TeamFlag from '@/components/ui/TeamFlag'
 
 export type MatchWithTeams = {
   id: number
@@ -478,9 +479,7 @@ export default function CrearGrupoStepper({
                     <ul className="divide-y divide-gray-100">
                       {groupMatches.map((match) => {
                         const checked = selectedIds.has(match.id)
-                        const homeFlag = match.home_team?.flag_emoji ?? ''
                         const homeName = match.home_team?.name ?? 'TBD'
-                        const awayFlag = match.away_team?.flag_emoji ?? ''
                         const awayName = match.away_team?.name ?? 'TBD'
 
                         return (
@@ -492,10 +491,12 @@ export default function CrearGrupoStepper({
                                 onChange={() => toggleMatch(match.id)}
                                 className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
-                              <span className="flex-1 text-sm text-gray-700">
-                                {homeFlag} {homeName}{' '}
+                              <span className="flex flex-1 items-center gap-1.5 text-sm text-gray-700">
+                                {match.home_team && <TeamFlag teamName={homeName} size="sm" />}
+                                {homeName}{' '}
                                 <span className="text-gray-400">vs</span>{' '}
-                                {awayFlag} {awayName}
+                                {awayName}
+                                {match.away_team && <TeamFlag teamName={awayName} size="sm" />}
                               </span>
                               <span className="shrink-0 text-xs text-gray-400">
                                 {formatMatchDate(match.scheduled_at)}

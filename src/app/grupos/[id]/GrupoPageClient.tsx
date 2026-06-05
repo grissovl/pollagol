@@ -16,6 +16,7 @@ import {
 } from '@/app/actions/grupo-detail'
 import { calcularPuntajes } from '@/app/actions/scoring'
 import JugarTab from './JugarTab'
+import TeamFlag from '@/components/ui/TeamFlag'
 export type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
   MatchData, PredictionData, LeaderboardEntry,
@@ -764,11 +765,13 @@ function PartidosTab({
                           onChange={() => toggleMatch(match.id)}
                           className="h-4 w-4 rounded border-gray-300 text-blue-600"
                         />
-                        <span className="flex-1 text-sm text-gray-700">
-                          {match.home_team?.flag_emoji ?? ''} {match.home_team?.name ?? 'TBD'}
-                          <span className="text-gray-400"> vs </span>
-                          {match.away_team?.flag_emoji ?? ''} {match.away_team?.name ?? 'TBD'}
-                          {match.group_name && <span className="ml-1 text-xs text-gray-400">(Gr. {match.group_name})</span>}
+                        <span className="flex flex-1 items-center gap-1.5 text-sm text-gray-700">
+                          {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                          {match.home_team?.name ?? 'TBD'}
+                          <span className="text-gray-400">vs</span>
+                          {match.away_team?.name ?? 'TBD'}
+                          {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
+                          {match.group_name && <span className="text-xs text-gray-400">(Gr. {match.group_name})</span>}
                         </span>
                         <span className="shrink-0 text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</span>
                       </label>
@@ -820,10 +823,12 @@ function PartidosTab({
                   >
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-gray-900">
-                          {match.home_team?.flag_emoji ?? ''} {match.home_team?.name ?? 'TBD'}
-                          <span className="mx-1.5 text-gray-400">vs</span>
-                          {match.away_team?.flag_emoji ?? ''} {match.away_team?.name ?? 'TBD'}
+                        <p className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+                          {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                          {match.home_team?.name ?? 'TBD'}
+                          <span className="text-gray-400">vs</span>
+                          {match.away_team?.name ?? 'TBD'}
+                          {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
                         </p>
                         <p className="mt-0.5 text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</p>
                       </div>

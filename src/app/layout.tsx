@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import Script from 'next/script'
 import './globals.css'
+import 'flag-icons/css/flag-icons.min.css'
 
 export const metadata: Metadata = {
   title: 'PollaGol',
