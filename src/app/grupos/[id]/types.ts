@@ -5,6 +5,7 @@ export type GrupoData = {
   code: string
   owner_id: string
   created_at: string
+  owner_plays: boolean
 }
 
 export type RulesData = {

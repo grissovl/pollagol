@@ -39,7 +39,7 @@ export default async function GrupoDetailPage({ params }: Props) {
   // ── Group ──────────────────────────────────────────────────────
   const { data: groupRaw } = await supabase
     .from('groups')
-    .select('id, name, description, code, owner_id, created_at')
+    .select('id, name, description, code, owner_id, created_at, owner_plays')
     .eq('id', params.id)
     .single()
 
@@ -187,6 +187,7 @@ export default async function GrupoDetailPage({ params }: Props) {
 
     leaderboard = members
       .filter((m) => m.status === 'accepted')
+      .filter((m) => group.owner_plays || m.user_id !== group.owner_id)
       .map((m) => ({
         user_id: m.user_id,
         name: m.profile.name,

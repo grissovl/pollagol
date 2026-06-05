@@ -43,6 +43,24 @@ async function assertOwner(groupId: string) {
   return { supabase, user }
 }
 
+export async function updateOwnerPlays(
+  groupId: string,
+  ownerPlays: boolean,
+): Promise<{ error?: string }> {
+  try {
+    const { supabase } = await assertOwner(groupId)
+    const { error } = await supabase
+      .from('groups')
+      .update({ owner_plays: ownerPlays })
+      .eq('id', groupId)
+    if (error) return { error: errMsg(error) }
+    revalidatePath(`/grupos/${groupId}`)
+    return {}
+  } catch (e) {
+    return { error: errMsg(e) }
+  }
+}
+
 export async function updateGroupRules(
   groupId: string,
   rules: RulesUpdate,

@@ -92,6 +92,7 @@ export interface Database {
           code: string
           owner_id: string
           created_at: string
+          owner_plays: boolean
         }
         Insert: {
           id?: string
@@ -100,11 +101,13 @@ export interface Database {
           code: string
           owner_id: string
           created_at?: string
+          owner_plays?: boolean
         }
         Update: {
           name?: string
           description?: string | null
           code?: string
+          owner_plays?: boolean
         }
       }
       group_rules: {

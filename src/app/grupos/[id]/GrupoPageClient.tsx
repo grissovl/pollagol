@@ -13,6 +13,7 @@ import {
   updateGroupRules, updateGroupPrizes, deleteGroup,
   acceptMembership, rejectMembership, removeMember,
   toggleMemberPayment, setGroupMatches, saveMatchResult,
+  updateOwnerPlays,
 } from '@/app/actions/grupo-detail'
 import { calcularPuntajes } from '@/app/actions/scoring'
 import JugarTab from './JugarTab'
@@ -342,6 +343,9 @@ function ConfigTab({
   })
   const [prizesMsg, setPrizesMsg] = useState<{ ok?: boolean; text: string } | null>(null)
 
+  const [ownerPlays, setOwnerPlays] = useState(group.owner_plays)
+  const [ownerPlaysMsg, setOwnerPlaysMsg] = useState<string | null>(null)
+
   const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [deleteError, setDeleteError] = useState('')
 
@@ -452,6 +456,47 @@ function ConfigTab({
         <Button onClick={handleUpdatePrizes} disabled={isPending} className="mt-4">
           Actualizar Premios
         </Button>
+      </section>
+
+      {/* Owner plays toggle */}
+      <section className="rounded-xl border border-gray-200 bg-white p-6 shadow-sm">
+        <h3 className="font-semibold text-gray-800">Participación del organizador</h3>
+        <p className="mt-1 text-sm text-gray-500">
+          Controla si el organizador participa como jugador en este grupo.
+        </p>
+        <div className="mt-4 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-700">Participar como jugador</p>
+            <p className="text-xs text-gray-400">
+              {ownerPlays
+                ? 'Tus predicciones cuentan en el ranking'
+                : 'No apareces en el ranking ni en el tab Jugar'}
+            </p>
+          </div>
+          <button
+            onClick={() => {
+              const next = !ownerPlays
+              setOwnerPlays(next)
+              setOwnerPlaysMsg(null)
+              startTransition(async () => {
+                const res = await updateOwnerPlays(group.id, next)
+                if (res.error) {
+                  setOwnerPlays(!next)
+                  setOwnerPlaysMsg(res.error)
+                } else {
+                  router.refresh()
+                }
+              })
+            }}
+            disabled={isPending}
+            className={`relative flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${ownerPlays ? 'bg-blue-600' : 'bg-gray-300'}`}
+          >
+            <span
+              className={`absolute h-4 w-4 rounded-full bg-white shadow transition-transform ${ownerPlays ? 'translate-x-6' : 'translate-x-1'}`}
+            />
+          </button>
+        </div>
+        {ownerPlaysMsg && <p className="mt-2 text-sm text-red-600">{ownerPlaysMsg}</p>}
       </section>
 
       {/* Delete group */}
@@ -994,8 +1039,12 @@ export default function GrupoPageClient({
   const memberStatus = myMembership?.status ?? null
   const isAccepted = memberStatus === 'accepted'
 
-  const adminTabs = ['Info', 'Configuración', 'Participantes', 'Partidos', 'Jugar', 'Ranking'] as const
-  const participantTabs = ['Info', 'Jugar', 'Tabla de Posiciones'] as const
+  const adminTabs = [
+    'Info', 'Configuración', 'Participantes', 'Partidos',
+    ...(group.owner_plays ? ['Jugar'] : []),
+    'Ranking',
+  ]
+  const participantTabs = ['Info', 'Jugar', 'Tabla de Posiciones']
 
   const tabs = isOwner ? adminTabs : participantTabs
   const [activeTab, setActiveTab] = useState<string>(tabs[0])
