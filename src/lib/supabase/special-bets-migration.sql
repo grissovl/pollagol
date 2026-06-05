@@ -67,6 +67,19 @@ do $$ begin
   end if;
 end $$;
 
+-- Users can delete their own bets (to clear a field)
+do $$ begin
+  if not exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'special_bets' and policyname = 'special_bets_delete'
+  ) then
+    execute $p$
+      create policy "special_bets_delete" on special_bets
+        for delete using (auth.uid() = user_id and not locked)
+    $p$;
+  end if;
+end $$;
+
 -- Verify policies:
 select schemaname, tablename, policyname, cmd, qual
 from   pg_policies
