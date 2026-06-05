@@ -54,6 +54,7 @@ export default function ApuestasTab({
     clearTimeout(timers.current[catId])
     timers.current[catId] = setTimeout(async () => {
       if (!value.trim()) return
+      console.log('[ApuestasTab] debounce fired →', { catId, value: value.trim() })
       setStatus((prev) => ({ ...prev, [catId]: 'saving' }))
       const res = await upsertSpecialBet(groupId, catId, value.trim())
       setStatus((prev) => ({ ...prev, [catId]: res.error ? 'error' : 'saved' }))

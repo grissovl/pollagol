@@ -243,6 +243,7 @@ export async function upsertSpecialBet(
   category: string,
   teamOrPlayer: string,
 ): Promise<{ error?: string }> {
+  console.log('[upsertSpecialBet] →', { groupId, category, teamOrPlayer })
   const supabase = createClient()
   const {
     data: { user },
@@ -261,16 +262,20 @@ export async function upsertSpecialBet(
     .eq('category', category)
     .maybeSingle()
 
+  console.log('[upsertSpecialBet] existing row:', existing, 'selectError:', selectError)
+
   if (selectError) {
     console.error('[upsertSpecialBet] select error:', selectError)
     return { error: errMsg(selectError) }
   }
 
   if (existing) {
+    // Omit updated_at — column may not exist in all deployments
     const { error } = await supabase
       .from('special_bets')
-      .update({ team_or_player: teamOrPlayer, updated_at: new Date().toISOString() })
+      .update({ team_or_player: teamOrPlayer })
       .eq('id', (existing as { id: string }).id)
+    console.log('[upsertSpecialBet] update result error:', error)
     if (error) {
       console.error('[upsertSpecialBet] update error:', error)
       return { error: errMsg(error) }
@@ -282,12 +287,14 @@ export async function upsertSpecialBet(
       category,
       team_or_player: teamOrPlayer,
     })
+    console.log('[upsertSpecialBet] insert result error:', error)
     if (error) {
       console.error('[upsertSpecialBet] insert error:', error)
       return { error: errMsg(error) }
     }
   }
 
+  revalidatePath(`/grupos/${groupId}`)
   return {}
 }
 
