@@ -25,11 +25,18 @@ export async function middleware(request: NextRequest) {
     }
   )
 
+  // Refresh the session token (needed on every request that reaches the middleware)
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
+
+  // API routes: let them through so they can read the refreshed session,
+  // but don't enforce auth redirect (each handler decides its own auth).
+  if (pathname.startsWith('/api/')) {
+    return supabaseResponse
+  }
 
   const authPages = ['/login', '/register', '/forgot-password']
   const isAuthPage = authPages.includes(pathname)
@@ -51,6 +58,15 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/|sw.js|workbox-.*\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    /*
+     * Match all paths except:
+     *  - _next/static  (Next.js build output)
+     *  - _next/image   (image optimization)
+     *  - favicon.ico, manifest.json
+     *  - /icons/       (PWA icons)
+     *  - sw.js, workbox-*.js (service worker files)
+     *  - static image/font extensions
+     */
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons/|sw.js|workbox-.*\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|woff2?)$).*)',
   ],
 }

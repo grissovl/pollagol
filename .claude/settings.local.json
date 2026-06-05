@@ -5,7 +5,12 @@
       "PowerShell(Get-ChildItem C:\\\\Users\\\\gvloc\\\\pollagol-app | ForEach-Object { Move-Item $_.FullName C:\\\\Users\\\\gvloc\\\\pollagol\\\\ -Force }; Write-Host \"Done\")",
       "Bash(git init *)",
       "Bash(git branch *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(npx tsc *)",
+      "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(JSON.stringify\\({supabase:pkg.dependencies['@supabase/supabase-js'], ssr:pkg.dependencies['@supabase/ssr']}, null, 2\\)\\)\")",
+      "Bash(npx next *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p['next-pwa']||{},null,2\\)\\); console.log\\('nextConfig?', Object.keys\\(p\\)\\)\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

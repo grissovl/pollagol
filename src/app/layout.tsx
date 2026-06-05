@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import Script from 'next/script'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -26,7 +27,19 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body className="antialiased">{children}</body>
+      <body className="antialiased">
+        {children}
+        {/* In development, unregister any stale service workers from previous production builds */}
+        {process.env.NODE_ENV === 'development' && (
+          <Script id="sw-cleanup" strategy="afterInteractive">{`
+            if ('serviceWorker' in navigator) {
+              navigator.serviceWorker.getRegistrations().then(regs => {
+                regs.forEach(r => r.unregister());
+              });
+            }
+          `}</Script>
+        )}
+      </body>
     </html>
   )
 }

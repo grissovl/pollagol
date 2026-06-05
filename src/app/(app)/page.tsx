@@ -1,19 +1,9 @@
 import Link from 'next/link'
-import { Users, Headphones, Search } from 'lucide-react'
+import { Users, Headphones, Search, ChevronRight } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
 import { Badge } from '@/components/ui/badge'
 import GroupSearchForm from './GroupSearchForm'
-
-type GroupStatus = 'pending' | 'accepted' | 'rejected'
-
-interface MemberGroup {
-  status: GroupStatus
-  groups: {
-    id: string
-    name: string
-    code: string
-  } | null
-}
+import type { GroupStatus } from '@/types/database.types'
 
 const statusLabel: Record<GroupStatus, string> = {
   pending: 'Pendiente',
@@ -27,6 +17,19 @@ const statusVariant: Record<GroupStatus, 'pending' | 'accepted' | 'rejected'> = 
   rejected: 'rejected',
 }
 
+interface MemberGroupRow {
+  status: GroupStatus
+  group_id: string
+  groups: { id: string; name: string; code: string } | null
+  accumulator: number
+}
+
+type MembershipRaw = {
+  status: string
+  group_id: string
+  groups: { id: string; name: string; code: string } | null
+}
+
 export default async function HomePage() {
   const supabase = createClient()
   const {
@@ -38,16 +41,48 @@ export default async function HomePage() {
     user?.email?.split('@')[0] ||
     'Usuario'
 
-  let memberGroups: MemberGroup[] = []
+  let memberGroups: MemberGroupRow[] = []
 
   if (user) {
-    const { data } = await supabase
-      .from('group_members')
-      .select('status, groups(id, name, code)')
+    // 1. Get user's memberships with group info
+    const { data: membershipsRaw } = (await supabase
+      .from('group_memberships')
+      .select('status, group_id, groups(id, name, code)')
       .eq('user_id', user.id)
+      .order('created_at', { ascending: false })) as { data: MembershipRaw[] | null }
 
-    if (data) {
-      memberGroups = data as unknown as MemberGroup[]
+    const memberships = membershipsRaw ?? []
+
+    if (memberships.length > 0) {
+      const groupIds = memberships.map((m) => m.group_id)
+
+      // 2. Get rules and paid counts in parallel
+      const [rulesResult, paidResult] = await Promise.all([
+        supabase.from('group_rules').select('group_id, bet_amount').in('group_id', groupIds),
+        supabase
+          .from('group_memberships')
+          .select('group_id')
+          .in('group_id', groupIds)
+          .eq('paid', true),
+      ])
+
+      const rulesData = (rulesResult.data ?? []) as { group_id: string; bet_amount: number }[]
+      const paidData = (paidResult.data ?? []) as { group_id: string }[]
+
+      const betByGroup: Record<string, number> = {}
+      rulesData.forEach((r) => { betByGroup[r.group_id] = r.bet_amount })
+
+      const paidCountByGroup: Record<string, number> = {}
+      paidData.forEach((m) => {
+        paidCountByGroup[m.group_id] = (paidCountByGroup[m.group_id] ?? 0) + 1
+      })
+
+      memberGroups = memberships.map((m) => ({
+        status: m.status as GroupStatus,
+        group_id: m.group_id,
+        groups: m.groups,
+        accumulator: (betByGroup[m.group_id] ?? 0) * (paidCountByGroup[m.group_id] ?? 0),
+      }))
     }
   }
 
@@ -62,7 +97,7 @@ export default async function HomePage() {
 
       {/* Action Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {/* Grupo Card */}
+        {/* Crear Grupo */}
         <div className="flex flex-col gap-4 rounded-xl bg-blue-600 p-6 text-white shadow-md">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-white/20 p-2">
@@ -81,7 +116,7 @@ export default async function HomePage() {
           </Link>
         </div>
 
-        {/* Soporte Card */}
+        {/* Soporte */}
         <div className="flex flex-col gap-4 rounded-xl bg-green-600 p-6 text-white shadow-md">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-white/20 p-2">
@@ -100,7 +135,7 @@ export default async function HomePage() {
           </a>
         </div>
 
-        {/* Buscar Grupo Card */}
+        {/* Buscar Grupo */}
         <div className="flex flex-col gap-4 rounded-xl bg-red-600 p-6 text-white shadow-md sm:col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3">
             <div className="rounded-lg bg-white/20 p-2">
@@ -108,9 +143,7 @@ export default async function HomePage() {
             </div>
             <h2 className="text-xl font-bold">Buscar Grupo</h2>
           </div>
-          <p className="text-sm text-red-100">
-            Ingresa el código del grupo al que quieres unirte.
-          </p>
+          <p className="text-sm text-red-100">Ingresa el código del grupo al que quieres unirte.</p>
           <GroupSearchForm />
         </div>
       </div>
@@ -130,26 +163,58 @@ export default async function HomePage() {
         ) : (
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <ul className="divide-y divide-gray-100">
-              {memberGroups.map((member, i) =>
-                member.groups ? (
-                  <li
-                    key={member.groups.id ?? i}
-                    className="flex items-center justify-between px-5 py-4 hover:bg-gray-50"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{member.groups.name}</p>
-                      <p className="text-xs text-gray-500">Código: {member.groups.code}</p>
-                    </div>
-                    <Badge variant={statusVariant[member.status]}>
-                      {statusLabel[member.status]}
-                    </Badge>
+              {memberGroups.map((member, i) => {
+                if (!member.groups) return null
+                const isAccepted = member.status === 'accepted'
+                const content = <GroupRow member={member} />
+
+                return (
+                  <li key={member.groups.id ?? i}>
+                    {isAccepted ? (
+                      <Link
+                        href={`/grupos/${member.groups.id}`}
+                        className="flex items-center justify-between px-5 py-4 hover:bg-gray-50"
+                      >
+                        {content}
+                      </Link>
+                    ) : (
+                      <div className="flex items-center justify-between px-5 py-4">
+                        {content}
+                      </div>
+                    )}
                   </li>
-                ) : null
-              )}
+                )
+              })}
             </ul>
           </div>
         )}
       </div>
     </div>
+  )
+}
+
+function GroupRow({ member }: { member: MemberGroupRow }) {
+  if (!member.groups) return null
+
+  return (
+    <>
+      <div className="min-w-0">
+        <p className="truncate font-medium text-gray-900">{member.groups.name}</p>
+        <div className="flex items-center gap-3 text-xs text-gray-500">
+          <span>
+            Código: <span className="font-mono">{member.groups.code}</span>
+          </span>
+          {member.accumulator > 0 && (
+            <span className="font-medium text-green-700">
+              Acumulado: ${member.accumulator.toLocaleString('es-CL')}
+            </span>
+          )}
+        </div>
+      </div>
+      <div className="ml-4 flex shrink-0 items-center gap-2">
+        <Badge variant={statusVariant[member.status]}>{statusLabel[member.status]}</Badge>
+        {member.status === 'accepted' && <ChevronRight className="h-4 w-4 text-gray-400" />}
+      </div>
+    </>
   )
 }
