@@ -10,7 +10,18 @@
       "Bash(node -e \"const pkg = require\\('./package.json'\\); console.log\\(JSON.stringify\\({supabase:pkg.dependencies['@supabase/supabase-js'], ssr:pkg.dependencies['@supabase/ssr']}, null, 2\\)\\)\")",
       "Bash(npx next *)",
       "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(JSON.stringify\\(p['next-pwa']||{},null,2\\)\\); console.log\\('nextConfig?', Object.keys\\(p\\)\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000/grupos/test-id)",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(Remove-Item -Recurse -Force .next -ErrorAction SilentlyContinue)",
+      "Bash(node *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3001/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:3000/)",
+      "Bash(curl -Ls -o /tmp/resp.txt -w \"%{http_code}\" http://localhost:3003/grupos/test-id)",
+      "Read(//tmp/**)"
     ]
   }
 }
