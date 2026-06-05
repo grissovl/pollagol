@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { calcularPuntajes } from './scoring'
 
 type RulesUpdate = {
   pts_exact: number
@@ -186,6 +187,28 @@ export async function setGroupMatches(
       if (error) return { error: errMsg(error) }
     }
 
+    revalidatePath(`/grupos/${groupId}`)
+    return {}
+  } catch (e) {
+    return { error: errMsg(e) }
+  }
+}
+
+export async function saveMatchResult(
+  groupId: string,
+  matchId: number,
+  homeScore: number,
+  awayScore: number,
+): Promise<{ error?: string }> {
+  try {
+    const { supabase } = await assertOwner(groupId)
+    const { error } = await supabase
+      .from('matches')
+      .update({ home_score: homeScore, away_score: awayScore, status: 'finished' })
+      .eq('id', matchId)
+    if (error) return { error: errMsg(error) }
+    const calc = await calcularPuntajes(groupId)
+    if (calc.error) return { error: calc.error }
     revalidatePath(`/grupos/${groupId}`)
     return {}
   } catch (e) {

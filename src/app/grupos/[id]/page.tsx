@@ -99,24 +99,30 @@ export default async function GrupoDetailPage({ params }: Props) {
     }))
   }
 
+  // ── Group match IDs (fetched first to avoid type-mismatch in Set lookup) ──
+  const { data: gmRaw } = await supabase
+    .from('group_matches')
+    .select('match_id')
+    .eq('group_id', params.id)
+
+  // Explicit Number() cast because bigint columns arrive as strings from PostgREST
+  const groupMatchIdSet = new Set(
+    ((gmRaw ?? []) as { match_id: number | string }[]).map((gm) => Number(gm.match_id)),
+  )
+
   // ── All matches + teams ────────────────────────────────────────
-  const [matchesResult, teamsResult, groupMatchesResult] = await Promise.all([
+  const [matchesResult, teamsResult] = await Promise.all([
     supabase
       .from('matches')
       .select('id, phase, group_name, scheduled_at, home_score, away_score, status, home_team_id, away_team_id')
       .order('scheduled_at'),
     supabase.from('teams').select('id, name, flag_emoji'),
-    supabase.from('group_matches').select('match_id').eq('group_id', params.id),
   ])
 
   const teamsById: Record<number, { name: string; flag_emoji: string | null }> = {}
   for (const t of ((teamsResult.data ?? []) as TeamRow[])) {
-    teamsById[t.id] = { name: t.name, flag_emoji: t.flag_emoji }
+    teamsById[Number(t.id)] = { name: t.name, flag_emoji: t.flag_emoji }
   }
-
-  const groupMatchIdSet = new Set(
-    ((groupMatchesResult.data ?? []) as { match_id: number }[]).map((gm) => gm.match_id),
-  )
 
   const allMatches: MatchData[] = ((matchesResult.data ?? []) as MatchRow[]).map((m) => ({
     id: m.id,
@@ -126,9 +132,9 @@ export default async function GrupoDetailPage({ params }: Props) {
     home_score: m.home_score,
     away_score: m.away_score,
     status: m.status,
-    home_team: m.home_team_id != null ? (teamsById[m.home_team_id] ?? null) : null,
-    away_team: m.away_team_id != null ? (teamsById[m.away_team_id] ?? null) : null,
-    in_group: groupMatchIdSet.has(m.id),
+    home_team: m.home_team_id != null ? (teamsById[Number(m.home_team_id)] ?? null) : null,
+    away_team: m.away_team_id != null ? (teamsById[Number(m.away_team_id)] ?? null) : null,
+    in_group: groupMatchIdSet.has(Number(m.id)),
   }))
 
   const groupMatches = allMatches.filter((m) => m.in_group)
@@ -187,7 +193,12 @@ export default async function GrupoDetailPage({ params }: Props) {
         avatar_url: m.profile.avatar_url,
         ...(userTotals[m.user_id] ?? { pts_exact: 0, pts_winner: 0, pts_goal: 0, pts_unique: 0, pts_bonus: 0, total: 0 }),
       }))
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => {
+        if (b.total !== a.total) return b.total - a.total
+        if (b.pts_exact !== a.pts_exact) return b.pts_exact - a.pts_exact
+        if (b.pts_winner !== a.pts_winner) return b.pts_winner - a.pts_winner
+        return b.pts_goal - a.pts_goal
+      })
   }
 
   return (

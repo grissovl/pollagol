@@ -59,7 +59,7 @@ function isMatchFinished(match: MatchData): boolean {
 
 export default function JugarTab({ groupId, matches, initialPredictions }: Props) {
   const [autosave, setAutosave] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('pending')
+  const [filter, setFilter] = useState<'all' | 'pending' | 'done'>('all')
 
   const initMap = (): Record<number, PredState> => {
     const map: Record<number, PredState> = {}
