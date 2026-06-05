@@ -7,6 +7,7 @@ import GrupoPageClient from './GrupoPageClient'
 import type {
   GrupoData, RulesData, MemberWithProfile, MatchData,
   PredictionData, LeaderboardEntry, MyMembership, SpecialBet,
+  PhasePrediction, PhaseResult, TeamBasic,
 } from './types'
 
 interface Props {
@@ -173,6 +174,26 @@ export default async function GrupoDetailPage({ params }: Props) {
     myPredictions = (predsRaw ?? []) as PredictionData[]
   }
 
+  // ── Phase predictions & results ────────────────────────────────
+  let myPhasePredictions: PhasePrediction[] = []
+  let allPhaseResults: PhaseResult[] = []
+
+  if (isAccepted || isOwner) {
+    const [ppResult, prResult] = await Promise.all([
+      supabase
+        .from('phase_predictions')
+        .select('phase, team_ids, locked')
+        .eq('group_id', params.id)
+        .eq('user_id', user.id),
+      supabase
+        .from('phase_results')
+        .select('phase, team_ids')
+        .eq('group_id', params.id),
+    ])
+    myPhasePredictions = (ppResult.data ?? []) as PhasePrediction[]
+    allPhaseResults = (prResult.data ?? []) as PhaseResult[]
+  }
+
   // ── Special bets ───────────────────────────────────────────────
   let mySpecialBets: SpecialBet[] = []
   let allSpecialBets: SpecialBet[] = []
@@ -244,8 +265,35 @@ export default async function GrupoDetailPage({ params }: Props) {
       userTotals[bet.user_id].total += pts
     }
 
+    // Phase prediction bonuses
+    const phaseResultsMapLb: Record<string, Set<number>> = {}
+    for (const pr of allPhaseResults) {
+      phaseResultsMapLb[pr.phase] = new Set((pr.team_ids ?? []).map(Number))
+    }
+    const phaseBonusPtsMap: Record<string, number> = {
+      r32: rules.pts_r32_bonus, r16: rules.pts_r16_bonus,
+      r8: rules.pts_r8_bonus, r4: rules.pts_r4_bonus, final: rules.pts_final_bonus,
+    }
+    const { data: allPpRaw } = await supabase
+      .from('phase_predictions')
+      .select('user_id, phase, team_ids')
+      .eq('group_id', params.id)
+    for (const pp of (allPpRaw ?? []) as { user_id: string; phase: string; team_ids: number[] }[]) {
+      const results = phaseResultsMapLb[pp.phase]
+      if (!results || results.size === 0) continue
+      const allCorrect = (pp.team_ids ?? []).map(Number).every((id) => results.has(id))
+      if (!allCorrect) continue
+      const pts = phaseBonusPtsMap[pp.phase] ?? 0
+      if (!pts) continue
+      if (!userTotals[pp.user_id]) {
+        userTotals[pp.user_id] = { pts_exact: 0, pts_winner: 0, pts_goal: 0, pts_unique: 0, pts_bonus: 0, total: 0 }
+      }
+      userTotals[pp.user_id].pts_bonus += pts
+      userTotals[pp.user_id].total += pts
+    }
+
     leaderboard = members
-      .filter((m) => m.status === 'accepted')
+      .filter((m) => m.status === 'accepted' && m.paid)
       .filter((m) => group.owner_plays || m.user_id !== group.owner_id)
       .map((m) => ({
         user_id: m.user_id,
@@ -283,6 +331,9 @@ export default async function GrupoDetailPage({ params }: Props) {
         leaderboard={leaderboard}
         mySpecialBets={mySpecialBets}
         allSpecialBets={allSpecialBets}
+        myPhasePredictions={myPhasePredictions}
+        allPhaseResults={allPhaseResults}
+        allTeams={(teamsResult.data ?? []).map((t) => ({ id: Number((t as TeamBasic).id), name: (t as TeamBasic).name, flag_emoji: (t as TeamBasic).flag_emoji }))}
       />
     </div>
   )

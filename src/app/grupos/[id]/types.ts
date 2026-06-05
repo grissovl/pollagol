@@ -86,3 +86,20 @@ export type SpecialBet = {
   team_or_player: string
   locked: boolean
 }
+
+export type PhasePrediction = {
+  phase: string
+  team_ids: number[]
+  locked: boolean
+}
+
+export type PhaseResult = {
+  phase: string
+  team_ids: number[]
+}
+
+export type TeamBasic = {
+  id: number
+  name: string
+  flag_emoji: string | null
+}

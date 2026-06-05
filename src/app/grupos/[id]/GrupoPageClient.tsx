@@ -19,16 +19,19 @@ import { calcularPuntajes } from '@/app/actions/scoring'
 import JugarTab from './JugarTab'
 import ApuestasTab from './ApuestasTab'
 import PuntuacionTab from './PuntuacionTab'
+import ClasificadosTab from './ClasificadosTab'
 import TeamFlag from '@/components/ui/TeamFlag'
 import { WC2026_TEAMS } from './constants'
 import { saveSpecialResults } from '@/app/actions/grupo-detail'
 export type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
   MatchData, PredictionData, LeaderboardEntry, SpecialBet,
+  PhasePrediction, PhaseResult, TeamBasic,
 } from './types'
 import type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
   MatchData, PredictionData, LeaderboardEntry, SpecialBet,
+  PhasePrediction, PhaseResult, TeamBasic,
 } from './types'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -46,6 +49,9 @@ interface Props {
   leaderboard: LeaderboardEntry[]
   mySpecialBets: SpecialBet[]
   allSpecialBets: SpecialBet[]
+  myPhasePredictions: PhasePrediction[]
+  allPhaseResults: PhaseResult[]
+  allTeams: TeamBasic[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -1198,6 +1204,7 @@ export default function GrupoPageClient({
   group, rules, myMembership, isOwner, userId,
   members, allMatches, groupMatches, myPredictions, leaderboard,
   mySpecialBets, allSpecialBets,
+  myPhasePredictions, allPhaseResults, allTeams,
 }: Props) {
   const memberStatus = myMembership?.status ?? null
   const isAccepted = memberStatus === 'accepted'
@@ -1207,10 +1214,11 @@ export default function GrupoPageClient({
   const adminTabs = [
     'Info', 'Configuración', 'Participantes', 'Partidos', 'Predicciones únicas',
     ...(group.owner_plays ? ['Jugar'] : []),
+    'Clasificados',
     'Cómo se puntúa',
     'Ranking',
   ]
-  const participantTabs = ['Info', 'Jugar', 'Predicciones únicas', 'Cómo se puntúa', 'Tabla de Posiciones']
+  const participantTabs = ['Info', 'Jugar', 'Predicciones únicas', 'Clasificados', 'Cómo se puntúa', 'Tabla de Posiciones']
 
   const tabs = isOwner ? adminTabs : participantTabs
   const [activeTab, setActiveTab] = useState<string>(tabs[0])
@@ -1325,6 +1333,18 @@ export default function GrupoPageClient({
               paid={isPaid}
             />
           )}
+          {isOwner && activeTab === 'Clasificados' && (
+            <ClasificadosTab
+              groupId={group.id}
+              isOwner
+              ownerPlays={group.owner_plays}
+              paid={isPaid}
+              rules={rules}
+              myPhasePredictions={myPhasePredictions}
+              allPhaseResults={allPhaseResults}
+              allTeams={allTeams}
+            />
+          )}
           {isOwner && activeTab === 'Cómo se puntúa' && (
             <PuntuacionTab rules={rules} />
           )}
@@ -1364,6 +1384,18 @@ export default function GrupoPageClient({
               allBets={[]}
               members={members}
               rules={rules}
+            />
+          )}
+          {!isOwner && activeTab === 'Clasificados' && (
+            <ClasificadosTab
+              groupId={group.id}
+              isOwner={false}
+              ownerPlays={group.owner_plays}
+              paid={isPaid}
+              rules={rules}
+              myPhasePredictions={myPhasePredictions}
+              allPhaseResults={allPhaseResults}
+              allTeams={allTeams}
             />
           )}
           {!isOwner && activeTab === 'Cómo se puntúa' && (

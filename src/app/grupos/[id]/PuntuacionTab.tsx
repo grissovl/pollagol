@@ -171,7 +171,53 @@ export default function PuntuacionTab({ rules }: Props) {
         </div>
       </section>
 
-      {/* ── Sección 3: Predicciones únicas ── */}
+      {/* ── Sección 3: Bonos de fases eliminatorias ── */}
+      <section className="space-y-3">
+        <div>
+          <h3 className="text-sm font-semibold text-gray-700">Bonos de fases eliminatorias</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            Al inicio de cada fase eliminatoria, debes seleccionar los equipos que crees que van a
+            clasificar a la siguiente ronda. Si aciertas <span className="font-semibold text-gray-700">TODOS</span> los
+            equipos de esa fase, ganas el bono completo. Si fallas aunque sea uno, no sumas puntos.
+          </p>
+        </div>
+        <div className="overflow-hidden rounded-xl border border-amber-200 bg-white">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-amber-50 text-xs font-semibold uppercase tracking-wide text-amber-700">
+                <th className="px-4 py-2.5 text-left">Fase</th>
+                <th className="px-4 py-2.5 text-center text-gray-500 font-normal normal-case tracking-normal">Seleccionar</th>
+                <th className="px-4 py-2.5 text-right">Bono</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {[
+                { label: '16avos de final', pick: '16 de 32 equipos', pts: rules.pts_r32_bonus },
+                { label: 'Octavos de final', pick: '8 de 16 equipos', pts: rules.pts_r16_bonus },
+                { label: 'Cuartos de final', pick: '4 de 8 equipos', pts: rules.pts_r8_bonus },
+                { label: 'Semifinales',      pick: '2 de 4 equipos', pts: rules.pts_r4_bonus },
+                { label: 'Final',            pick: '1 campeón',      pts: rules.pts_final_bonus },
+              ].map((row) => (
+                <tr key={row.label}>
+                  <td className="px-4 py-2.5 font-medium text-gray-800">{row.label}</td>
+                  <td className="px-4 py-2.5 text-center text-xs text-gray-400">{row.pick}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <span className="rounded-full bg-amber-100 px-2.5 py-1 text-sm font-bold text-amber-700">
+                      {row.pts} pts
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-xs text-gray-400">
+          Las selecciones se abren cuando el admin ingresa los clasificados de la fase anterior y se
+          cierran 15 minutos antes del primer partido de cada fase.
+        </p>
+      </section>
+
+      {/* ── Sección 4: Predicciones únicas ── */}
       <section className="space-y-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-700">Predicciones únicas del torneo</h3>

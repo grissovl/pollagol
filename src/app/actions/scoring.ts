@@ -160,3 +160,64 @@ export async function calcularPuntajes(
     return { error: errMsg(e) }
   }
 }
+
+const PHASE_DEADLINES: Record<string, string> = {
+  r32: '2026-06-28T18:45:00Z',
+  r16: '2026-07-04T16:45:00Z',
+  r8: '2026-07-09T19:45:00Z',
+  r4: '2026-07-14T18:45:00Z',
+  final: '2026-07-19T18:45:00Z',
+}
+
+export async function savePhasePrediction(
+  groupId: string,
+  phase: string,
+  teamIds: number[],
+): Promise<{ error?: string }> {
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { error: 'No autenticado' }
+
+    const deadline = PHASE_DEADLINES[phase]
+    if (deadline && new Date() > new Date(deadline)) return { error: 'La fase ya está cerrada' }
+
+    const { error } = await supabase.from('phase_predictions').upsert(
+      { group_id: groupId, user_id: user.id, phase, team_ids: teamIds },
+      { onConflict: 'group_id,user_id,phase' },
+    )
+    if (error) return { error: errMsg(error) }
+    return {}
+  } catch (e) {
+    return { error: errMsg(e) }
+  }
+}
+
+export async function savePhaseResults(
+  groupId: string,
+  phase: string,
+  teamIds: number[],
+): Promise<{ error?: string }> {
+  try {
+    const { supabase } = await assertOwner(groupId)
+
+    const { error: resErr } = await supabase.from('phase_results').upsert(
+      { group_id: groupId, phase, team_ids: teamIds, updated_at: new Date().toISOString() },
+      { onConflict: 'group_id,phase' },
+    )
+    if (resErr) return { error: errMsg(resErr) }
+
+    if (phase !== 'group') {
+      await supabase
+        .from('phase_predictions')
+        .update({ locked: true })
+        .eq('group_id', groupId)
+        .eq('phase', phase)
+    }
+
+    revalidatePath(`/grupos/${groupId}`)
+    return {}
+  } catch (e) {
+    return { error: errMsg(e) }
+  }
+}
