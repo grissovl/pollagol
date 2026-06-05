@@ -1085,11 +1085,12 @@ function PartidosTab({
 // ── PARTICIPANT TABS ───────────────────────────────────────────────────────────
 
 function ParticipantInfoTab({
-  group, rules, myMembership,
+  group, rules, myMembership, acumulado,
 }: {
   group: GrupoData
   rules: RulesData
   myMembership: MyMembership | null
+  acumulado: number
 }) {
   return (
     <div className="space-y-6">
@@ -1097,6 +1098,18 @@ function ParticipantInfoTab({
         <h2 className="text-xl font-bold text-gray-900">{group.name}</h2>
         <ShareButtons groupName={group.name} code={group.code} />
       </div>
+
+      {rules.bet_amount > 0 && (
+        <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 text-gray-500">
+            <DollarSign className="h-4 w-4" />
+            <span className="text-xs font-medium">Acumulado</span>
+          </div>
+          <p className="mt-1.5 text-xl font-bold text-gray-900">
+            ${acumulado.toLocaleString('es-CL')}
+          </p>
+        </div>
+      )}
 
       {myMembership && (
         <div className="rounded-xl border border-gray-200 bg-white p-4">
@@ -1321,7 +1334,16 @@ export default function GrupoPageClient({
 
           {/* Participant tabs */}
           {!isOwner && activeTab === 'Info' && (
-            <ParticipantInfoTab group={group} rules={rules} myMembership={myMembership} />
+            <ParticipantInfoTab
+              group={group}
+              rules={rules}
+              myMembership={myMembership}
+              acumulado={
+                members
+                  .filter((m) => m.status === 'accepted' && m.paid && (group.owner_plays || m.user_id !== group.owner_id))
+                  .length * rules.bet_amount
+              }
+            />
           )}
           {!isOwner && activeTab === 'Jugar' && (
             <JugarTab

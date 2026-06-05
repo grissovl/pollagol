@@ -112,6 +112,24 @@ export default function ApuestasTab({
         )}
       </div>
 
+      {/* Info note for player names */}
+      <p className="flex gap-1.5 text-xs text-gray-400">
+        <span className="mt-px shrink-0">ℹ️</span>
+        <span>
+          Para premios individuales (Balón de Oro, Bota de Oro y Guante de Oro), escribe el nombre
+          del jugador exactamente como aparece en la{' '}
+          <a
+            href="https://www.fifa.com/es/tournaments/mens/worldcup/canadamexicousa2026"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline hover:text-gray-600"
+          >
+            página oficial de la FIFA
+          </a>
+          .
+        </span>
+      </p>
+
       {/* 4 bet cards */}
       <div className="grid gap-4 sm:grid-cols-2">
         {CATEGORIES.map((cat) => {

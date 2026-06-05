@@ -1,5 +1,8 @@
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import CrearGrupoStepper, { type MatchWithTeams } from './CrearGrupoStepper'
+
+const ADMIN_EMAIL = 'admin@pollagol.cl'
 
 type MatchRow = {
   id: number
@@ -17,6 +20,27 @@ type TeamRow = {
 
 export default async function CrearGrupoPage() {
   const supabase = createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user?.email !== ADMIN_EMAIL) {
+    return (
+      <div className="mx-auto max-w-md py-20 text-center">
+        <p className="mb-1 text-lg font-semibold text-gray-800">
+          La creación de grupos está temporalmente cerrada.
+        </p>
+        <p className="mb-8 text-sm text-gray-500">
+          Contacta al administrador para unirte a un grupo existente.
+        </p>
+        <Link
+          href="/"
+          className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
+        >
+          Volver al inicio
+        </Link>
+      </div>
+    )
+  }
 
   // Two separate queries — avoids ambiguous FK hint issues with PostgREST.
   const [matchesResult, teamsResult] = await Promise.all([

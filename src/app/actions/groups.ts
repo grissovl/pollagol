@@ -55,6 +55,10 @@ export async function createGroup(
     return { error: 'No autenticado. Vuelve a iniciar sesión.' }
   }
 
+  if (user.email !== 'admin@pollagol.cl') {
+    return { error: 'No autorizado' }
+  }
+
   // 2. Ensure profile exists (trigger may not have run if user pre-dates schema)
   const { error: profileError } = await supabase.from('profiles').upsert(
     {
