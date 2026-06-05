@@ -1,8 +1,8 @@
 {
   "name": "PollaGol",
   "short_name": "PollaGol",
-  "description": "App de polla mundialista",
-  "theme_color": "#1d4ed8",
+  "description": "Polla del Mundial 2026",
+  "theme_color": "#1976d2",
   "background_color": "#ffffff",
   "display": "standalone",
   "orientation": "portrait",
