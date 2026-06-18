@@ -1340,7 +1340,7 @@ function PronosticosTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
                 Partido
               </th>
               {playingMembers.map((m) => (
@@ -1359,7 +1359,7 @@ function PronosticosTab({
               const matchPreds = predMap[match.id] ?? {}
               return (
                 <tr key={match.id} className="hover:bg-gray-50/50">
-                  <td className="sticky left-0 z-10 bg-white px-4 py-3">
+                  <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
                       <p className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-900">
                         {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
@@ -1448,7 +1448,7 @@ function HistorialTab({
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
-              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600">
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
                 Partido · Resultado
               </th>
               {playingMembers.map((m) => (
@@ -1467,7 +1467,7 @@ function HistorialTab({
               const matchPreds = predMap[match.id] ?? {}
               return (
                 <tr key={match.id}>
-                  <td className="sticky left-0 z-10 bg-white px-4 py-3">
+                  <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
                       <p className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-900">
                         {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
@@ -1507,7 +1507,7 @@ function HistorialTab({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-gray-200 bg-gray-50">
-              <td className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-700">
+              <td className="px-4 py-3 text-xs font-semibold text-gray-700">
                 Total
               </td>
               {playingMembers.map((m) => (
