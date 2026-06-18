@@ -103,3 +103,16 @@ export type TeamBasic = {
   name: string
   flag_emoji: string | null
 }
+
+export type AllPredictionData = {
+  user_id: string
+  match_id: number
+  home_score_pred: number | null
+  away_score_pred: number | null
+  pts_exact: number
+  pts_winner: number
+  pts_goal: number
+  pts_unique: number
+  pts_bonus: number
+  total: number
+}

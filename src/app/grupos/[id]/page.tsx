@@ -7,7 +7,7 @@ import GrupoPageClient from './GrupoPageClient'
 import type {
   GrupoData, RulesData, MemberWithProfile, MatchData,
   PredictionData, LeaderboardEntry, MyMembership, SpecialBet,
-  PhasePrediction, PhaseResult, TeamBasic,
+  PhasePrediction, PhaseResult, TeamBasic, AllPredictionData,
 } from './types'
 
 interface Props {
@@ -211,10 +211,11 @@ export default async function GrupoDetailPage({ params }: Props) {
 
   // ── Leaderboard ────────────────────────────────────────────────
   let leaderboard: LeaderboardEntry[] = []
+  let allGroupPredictions: AllPredictionData[] = []
   if (isAccepted || isOwner) {
     const { data: allPredsRaw } = await supabase
       .from('predictions')
-      .select('id, user_id, match_id')
+      .select('id, user_id, match_id, home_score_pred, away_score_pred')
       .eq('group_id', params.id)
 
     const predIds = ((allPredsRaw ?? []) as { id: string }[]).map((p) => p.id)
@@ -226,6 +227,28 @@ export default async function GrupoDetailPage({ params }: Props) {
     const { data: scoresRaw } = predIds.length > 0
       ? await supabase.from('prediction_scores').select('prediction_id, pts_exact, pts_winner, pts_goal, pts_unique, pts_bonus, total').in('prediction_id', predIds)
       : { data: [] }
+
+    const scoreByPredId: Record<string, ScoreRow> = {}
+    for (const s of (scoresRaw ?? []) as ScoreRow[]) {
+      scoreByPredId[s.prediction_id] = s
+    }
+    allGroupPredictions = ((allPredsRaw ?? []) as {
+      id: string; user_id: string; match_id: number; home_score_pred: number | null; away_score_pred: number | null
+    }[]).map((p) => {
+      const score = scoreByPredId[p.id]
+      return {
+        user_id: p.user_id,
+        match_id: Number(p.match_id),
+        home_score_pred: p.home_score_pred,
+        away_score_pred: p.away_score_pred,
+        pts_exact: score?.pts_exact ?? 0,
+        pts_winner: score?.pts_winner ?? 0,
+        pts_goal: score?.pts_goal ?? 0,
+        pts_unique: score?.pts_unique ?? 0,
+        pts_bonus: score?.pts_bonus ?? 0,
+        total: score?.total ?? 0,
+      }
+    })
 
     const userTotals: Record<string, { pts_exact: number; pts_winner: number; pts_goal: number; pts_unique: number; pts_bonus: number; total: number }> = {}
 
@@ -334,6 +357,7 @@ export default async function GrupoDetailPage({ params }: Props) {
         myPhasePredictions={myPhasePredictions}
         allPhaseResults={allPhaseResults}
         allTeams={(teamsResult.data ?? []).map((t) => ({ id: Number((t as TeamBasic).id), name: (t as TeamBasic).name, flag_emoji: (t as TeamBasic).flag_emoji }))}
+        allGroupPredictions={allGroupPredictions}
       />
     </div>
   )

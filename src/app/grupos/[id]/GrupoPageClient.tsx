@@ -26,12 +26,12 @@ import { saveSpecialResults } from '@/app/actions/grupo-detail'
 export type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
   MatchData, PredictionData, LeaderboardEntry, SpecialBet,
-  PhasePrediction, PhaseResult, TeamBasic,
+  PhasePrediction, PhaseResult, TeamBasic, AllPredictionData,
 } from './types'
 import type {
   GrupoData, RulesData, MyMembership, MemberWithProfile,
   MatchData, PredictionData, LeaderboardEntry, SpecialBet,
-  PhasePrediction, PhaseResult, TeamBasic,
+  PhasePrediction, PhaseResult, TeamBasic, AllPredictionData,
 } from './types'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
@@ -52,6 +52,7 @@ interface Props {
   myPhasePredictions: PhasePrediction[]
   allPhaseResults: PhaseResult[]
   allTeams: TeamBasic[]
+  allGroupPredictions: AllPredictionData[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -757,7 +758,10 @@ function PartidosTab({
   const pastGroupMatches = allMatches.filter(
     (m) => m.in_group && new Date(m.scheduled_at) < now,
   )
+  const pendingMatches = pastGroupMatches.filter((m) => m.home_score == null || m.away_score == null)
+  const completedMatches = pastGroupMatches.filter((m) => m.home_score != null && m.away_score != null)
   const [showResultados, setShowResultados] = useState(pastGroupMatches.length > 0)
+  const [showCompletados, setShowCompletados] = useState(false)
   const [showPartidos, setShowPartidos] = useState(false)
   const [scores, setScores] = useState<Record<number, { home: string; away: string }>>(() => {
     const init: Record<number, { home: string; away: string }> = {}
@@ -846,9 +850,9 @@ function PartidosTab({
         >
           <span>
             Ingresar resultados
-            {pastGroupMatches.length > 0 && (
+            {pendingMatches.length > 0 && (
               <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                {pastGroupMatches.length} pendiente{pastGroupMatches.length > 1 ? 's' : ''}
+                {pendingMatches.length} pendiente{pendingMatches.length > 1 ? 's' : ''}
               </span>
             )}
           </span>
@@ -857,10 +861,12 @@ function PartidosTab({
 
         {showResultados && (
           <div className="mt-3 space-y-3">
-            {pastGroupMatches.length === 0 ? (
-              <p className="text-sm text-gray-400">No hay partidos pasados sin resultado.</p>
+            {pendingMatches.length === 0 && completedMatches.length === 0 ? (
+              <p className="text-sm text-gray-400">No hay partidos pasados.</p>
+            ) : pendingMatches.length === 0 ? (
+              <p className="text-sm text-gray-400">Todos los partidos tienen resultado ingresado.</p>
             ) : (
-              pastGroupMatches.map((match) => {
+              pendingMatches.map((match) => {
                 const s = scores[match.id] ?? { home: '', away: '' }
                 const mmsg = matchMsgs[match.id]
                 return (
@@ -924,6 +930,86 @@ function PartidosTab({
                   </div>
                 )
               })
+            )}
+            {completedMatches.length > 0 && (
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowCompletados((v) => !v)}
+                  className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+                >
+                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${showCompletados ? 'rotate-180' : ''}`} />
+                  {showCompletados ? 'Ocultar' : 'Mostrar'} completados ({completedMatches.length})
+                </button>
+                {showCompletados && (
+                  <div className="mt-2 space-y-3">
+                    {completedMatches.map((match) => {
+                      const s = scores[match.id] ?? { home: '', away: '' }
+                      const mmsg = matchMsgs[match.id]
+                      return (
+                        <div
+                          key={match.id}
+                          className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm opacity-80"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
+                                {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                                {match.home_team?.name ?? 'TBD'}
+                                <span className="text-gray-400">vs</span>
+                                {match.away_team?.name ?? 'TBD'}
+                                {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
+                              </p>
+                              <p className="mt-0.5 text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</p>
+                            </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder="0"
+                                value={s.home}
+                                onChange={(e) =>
+                                  setScores((prev) => ({
+                                    ...prev,
+                                    [match.id]: { ...prev[match.id], home: e.target.value },
+                                  }))
+                                }
+                                className="w-16 text-center"
+                              />
+                              <span className="text-sm font-bold text-gray-400">-</span>
+                              <Input
+                                type="number"
+                                min={0}
+                                placeholder="0"
+                                value={s.away}
+                                onChange={(e) =>
+                                  setScores((prev) => ({
+                                    ...prev,
+                                    [match.id]: { ...prev[match.id], away: e.target.value },
+                                  }))
+                                }
+                                className="w-16 text-center"
+                              />
+                              <Button
+                                size="sm"
+                                onClick={() => handleSaveResult(match.id)}
+                                disabled={isPending}
+                              >
+                                Guardar
+                              </Button>
+                            </div>
+                          </div>
+                          {mmsg && (
+                            <p className={`mt-2 text-xs ${mmsg.ok ? 'text-green-600' : 'text-red-500'}`}>
+                              {mmsg.text}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -1198,13 +1284,255 @@ function PosicionesTab({ leaderboard, userId }: { leaderboard: LeaderboardEntry[
   )
 }
 
+// ── Historial cell style by points ───────────────────────────────────────────
+
+function getPtsStyle(pts: number): { bg: string; text: string } {
+  if (pts >= 10) return { bg: 'bg-yellow-400', text: 'text-yellow-900' }
+  if (pts === 5)  return { bg: 'bg-green-500',  text: 'text-white' }
+  if (pts === 4)  return { bg: 'bg-green-400',  text: 'text-green-900' }
+  if (pts === 3)  return { bg: 'bg-green-300',  text: 'text-green-800' }
+  if (pts === 2)  return { bg: 'bg-green-200',  text: 'text-green-700' }
+  if (pts === 1)  return { bg: 'bg-green-100',  text: 'text-green-700' }
+  return { bg: 'bg-gray-100', text: 'text-gray-500' }
+}
+
+// ── PronosticosTab ────────────────────────────────────────────────────────────
+
+function PronosticosTab({
+  groupMatches, members, allGroupPredictions, group, userId,
+}: {
+  groupMatches: MatchData[]
+  members: MemberWithProfile[]
+  allGroupPredictions: AllPredictionData[]
+  group: GrupoData
+  userId: string
+}) {
+  const now = new Date()
+  const matches = groupMatches
+    .filter((m) => new Date(m.scheduled_at) <= now && m.home_score == null)
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+
+  const playingMembers = members
+    .filter((m) => m.status === 'accepted')
+    .filter((m) => group.owner_plays || m.user_id !== group.owner_id)
+
+  const predMap: Record<number, Record<string, AllPredictionData>> = {}
+  for (const p of allGroupPredictions) {
+    if (!predMap[p.match_id]) predMap[p.match_id] = {}
+    predMap[p.match_id][p.user_id] = p
+  }
+
+  if (matches.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-200 p-10 text-center">
+        <p className="text-gray-500">No hay partidos en curso con pronósticos disponibles.</p>
+        <p className="mt-1 text-sm text-gray-400">Los pronósticos se revelan cuando el partido comienza.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500">
+        {matches.length} partido{matches.length > 1 ? 's' : ''} iniciado{matches.length > 1 ? 's' : ''} sin resultado
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50">
+              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                Partido
+              </th>
+              {playingMembers.map((m) => (
+                <th
+                  key={m.user_id}
+                  title={m.profile.name}
+                  className={`min-w-[72px] px-3 py-3 text-center text-xs font-semibold ${m.user_id === userId ? 'text-blue-700' : 'text-gray-600'}`}
+                >
+                  {m.profile.name.split(' ')[0]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {matches.map((match) => {
+              const matchPreds = predMap[match.id] ?? {}
+              return (
+                <tr key={match.id} className="hover:bg-gray-50/50">
+                  <td className="sticky left-0 z-10 bg-white px-4 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-900">
+                        {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                        {match.home_team?.name ?? 'TBD'}
+                        <span className="text-gray-400">vs</span>
+                        {match.away_team?.name ?? 'TBD'}
+                        {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
+                      </p>
+                      <p className="text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</p>
+                    </div>
+                  </td>
+                  {playingMembers.map((m) => {
+                    const pred = matchPreds[m.user_id]
+                    if (!pred || pred.home_score_pred == null) {
+                      return (
+                        <td key={m.user_id} className="px-3 py-3 text-center text-gray-300">—</td>
+                      )
+                    }
+                    return (
+                      <td
+                        key={m.user_id}
+                        className={`px-3 py-3 text-center text-xs font-semibold ${m.user_id === userId ? 'text-blue-700' : 'text-gray-800'}`}
+                      >
+                        {pred.home_score_pred}-{pred.away_score_pred}
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+// ── HistorialTab ──────────────────────────────────────────────────────────────
+
+function HistorialTab({
+  groupMatches, members, allGroupPredictions, group, userId,
+}: {
+  groupMatches: MatchData[]
+  members: MemberWithProfile[]
+  allGroupPredictions: AllPredictionData[]
+  group: GrupoData
+  userId: string
+}) {
+  const now = new Date()
+  const matches = groupMatches
+    .filter((m) => new Date(m.scheduled_at) <= now && m.home_score != null)
+    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
+
+  const playingMembers = members
+    .filter((m) => m.status === 'accepted')
+    .filter((m) => group.owner_plays || m.user_id !== group.owner_id)
+
+  const predMap: Record<number, Record<string, AllPredictionData>> = {}
+  for (const p of allGroupPredictions) {
+    if (!predMap[p.match_id]) predMap[p.match_id] = {}
+    predMap[p.match_id][p.user_id] = p
+  }
+
+  const memberTotals: Record<string, number> = {}
+  for (const m of playingMembers) {
+    memberTotals[m.user_id] = 0
+    for (const match of matches) {
+      memberTotals[m.user_id] += predMap[match.id]?.[m.user_id]?.total ?? 0
+    }
+  }
+
+  if (matches.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-200 p-10 text-center">
+        <p className="text-gray-500">Aún no hay partidos completados con resultados.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500">
+        {matches.length} partido{matches.length > 1 ? 's' : ''} completado{matches.length > 1 ? 's' : ''}
+      </p>
+      <div className="overflow-x-auto rounded-xl border border-gray-200">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 bg-gray-50">
+              <th className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                Partido · Resultado
+              </th>
+              {playingMembers.map((m) => (
+                <th
+                  key={m.user_id}
+                  title={m.profile.name}
+                  className={`min-w-[72px] px-3 py-3 text-center text-xs font-semibold ${m.user_id === userId ? 'text-blue-700' : 'text-gray-600'}`}
+                >
+                  {m.profile.name.split(' ')[0]}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {matches.map((match) => {
+              const matchPreds = predMap[match.id] ?? {}
+              return (
+                <tr key={match.id}>
+                  <td className="sticky left-0 z-10 bg-white px-4 py-3">
+                    <div className="flex flex-col gap-0.5">
+                      <p className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-900">
+                        {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                        {match.home_team?.name ?? 'TBD'}
+                        <span className="text-gray-400">vs</span>
+                        {match.away_team?.name ?? 'TBD'}
+                        {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
+                      </p>
+                      <p className="text-xs font-bold text-gray-800">
+                        {match.home_score}-{match.away_score}
+                      </p>
+                      <p className="text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</p>
+                    </div>
+                  </td>
+                  {playingMembers.map((m) => {
+                    const pred = matchPreds[m.user_id]
+                    if (!pred || pred.home_score_pred == null) {
+                      return (
+                        <td key={m.user_id} className="px-3 py-3 text-center text-gray-300">—</td>
+                      )
+                    }
+                    const { bg, text } = getPtsStyle(pred.total)
+                    return (
+                      <td key={m.user_id} className={`px-3 py-3 text-center ${bg}`}>
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className={`text-xs font-semibold ${text} ${m.user_id === userId ? 'underline' : ''}`}>
+                            {pred.total >= 10 && '⭐'}{pred.home_score_pred}-{pred.away_score_pred}
+                          </span>
+                          <span className={`text-xs ${text}`}>{pred.total} pts</span>
+                        </div>
+                      </td>
+                    )
+                  })}
+                </tr>
+              )
+            })}
+          </tbody>
+          <tfoot>
+            <tr className="border-t-2 border-gray-200 bg-gray-50">
+              <td className="sticky left-0 z-10 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-700">
+                Total
+              </td>
+              {playingMembers.map((m) => (
+                <td
+                  key={m.user_id}
+                  className={`px-3 py-3 text-center text-sm font-bold ${m.user_id === userId ? 'text-blue-700' : 'text-gray-800'}`}
+                >
+                  {memberTotals[m.user_id]}
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function GrupoPageClient({
   group, rules, myMembership, isOwner, userId,
   members, allMatches, groupMatches, myPredictions, leaderboard,
   mySpecialBets, allSpecialBets,
-  myPhasePredictions, allPhaseResults, allTeams,
+  myPhasePredictions, allPhaseResults, allTeams, allGroupPredictions,
 }: Props) {
   const memberStatus = myMembership?.status ?? null
   const isAccepted = memberStatus === 'accepted'
@@ -1214,11 +1542,13 @@ export default function GrupoPageClient({
   const adminTabs = [
     'Info', 'Configuración', 'Participantes', 'Partidos', 'Predicciones únicas',
     ...(group.owner_plays ? ['Jugar'] : []),
+    'Pronósticos',
+    'Historial',
     'Clasificados',
     'Cómo se puntúa',
     'Ranking',
   ]
-  const participantTabs = ['Info', 'Jugar', 'Predicciones únicas', 'Clasificados', 'Cómo se puntúa', 'Tabla de Posiciones']
+  const participantTabs = ['Info', 'Jugar', 'Predicciones únicas', 'Pronósticos', 'Historial', 'Clasificados', 'Cómo se puntúa', 'Tabla de Posiciones']
 
   const tabs = isOwner ? adminTabs : participantTabs
   const [activeTab, setActiveTab] = useState<string>(tabs[0])
@@ -1343,6 +1673,24 @@ export default function GrupoPageClient({
               myPhasePredictions={myPhasePredictions}
               allPhaseResults={allPhaseResults}
               allTeams={allTeams}
+            />
+          )}
+          {activeTab === 'Pronósticos' && (
+            <PronosticosTab
+              groupMatches={groupMatches}
+              members={members}
+              allGroupPredictions={allGroupPredictions}
+              group={group}
+              userId={userId}
+            />
+          )}
+          {activeTab === 'Historial' && (
+            <HistorialTab
+              groupMatches={groupMatches}
+              members={members}
+              allGroupPredictions={allGroupPredictions}
+              group={group}
+              userId={userId}
             />
           )}
           {isOwner && activeTab === 'Cómo se puntúa' && (
