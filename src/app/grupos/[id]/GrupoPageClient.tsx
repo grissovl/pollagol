@@ -1299,14 +1299,17 @@ function getPtsStyle(pts: number): { bg: string; text: string } {
 // ── PronosticosTab ────────────────────────────────────────────────────────────
 
 function PronosticosTab({
-  groupMatches, members, allGroupPredictions, group, userId,
+  groupMatches, members, allGroupPredictions, group, userId, leaderboard,
 }: {
   groupMatches: MatchData[]
   members: MemberWithProfile[]
   allGroupPredictions: AllPredictionData[]
   group: GrupoData
   userId: string
+  leaderboard: LeaderboardEntry[]
 }) {
+  const [copiedMatchId, setCopiedMatchId] = useState<number | null>(null)
+
   const now = new Date()
   const matches = groupMatches
     .filter((m) => new Date(m.scheduled_at) <= now && m.home_score == null)
@@ -1320,6 +1323,36 @@ function PronosticosTab({
   for (const p of allGroupPredictions) {
     if (!predMap[p.match_id]) predMap[p.match_id] = {}
     predMap[p.match_id][p.user_id] = p
+  }
+
+  const rankIndex: Record<string, number> = {}
+  leaderboard.forEach((e, i) => { rankIndex[e.user_id] = i })
+
+  const sortedMembers = [...playingMembers].sort((a, b) => {
+    const ra = rankIndex[a.user_id] ?? Infinity
+    const rb = rankIndex[b.user_id] ?? Infinity
+    return ra - rb
+  })
+
+  const handleCopy = async (match: MatchData) => {
+    const matchPreds = predMap[match.id] ?? {}
+    const firstName = (name: string) => name.split(' ')[0]
+    const firstNames = sortedMembers.map((m) => firstName(m.profile.name))
+    const maxLen = firstNames.reduce((max, n) => Math.max(max, n.length), 0)
+    const homeTeam = match.home_team?.name ?? 'TBD'
+    const awayTeam = match.away_team?.name ?? 'TBD'
+    const homeFlag = match.home_team?.flag_emoji ?? ''
+    const awayFlag = match.away_team?.flag_emoji ?? ''
+    const lines = sortedMembers.map((m, i) => {
+      const pred = matchPreds[m.user_id]
+      const name = firstNames[i].padEnd(maxLen, ' ')
+      if (!pred || pred.home_score_pred == null) return `${name}   —`
+      return `${name}   ${pred.home_score_pred} - ${pred.away_score_pred}`
+    })
+    const title = `*Pronósticos* ${homeTeam} ${homeFlag} vs ${awayTeam} ${awayFlag}`.trimEnd()
+    await navigator.clipboard.writeText(`${title}\n\n${lines.join('\n')}`)
+    setCopiedMatchId(match.id)
+    setTimeout(() => setCopiedMatchId(null), 2000)
   }
 
   if (matches.length === 0) {
@@ -1357,17 +1390,37 @@ function PronosticosTab({
           <tbody className="divide-y divide-gray-100">
             {matches.map((match) => {
               const matchPreds = predMap[match.id] ?? {}
+              const isCopied = copiedMatchId === match.id
               return (
                 <tr key={match.id} className="hover:bg-gray-50/50">
                   <td className="px-4 py-3">
                     <div className="flex flex-col gap-0.5">
-                      <p className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-900">
-                        {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
-                        {match.home_team?.name ?? 'TBD'}
-                        <span className="text-gray-400">vs</span>
-                        {match.away_team?.name ?? 'TBD'}
-                        {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="flex items-center gap-1 whitespace-nowrap text-xs font-medium text-gray-900">
+                          {match.home_team && <TeamFlag teamName={match.home_team.name} size="sm" />}
+                          {match.home_team?.name ?? 'TBD'}
+                          <span className="text-gray-400">vs</span>
+                          {match.away_team?.name ?? 'TBD'}
+                          {match.away_team && <TeamFlag teamName={match.away_team.name} size="sm" />}
+                        </p>
+                        <button
+                          onClick={() => handleCopy(match)}
+                          title="Copiar pronósticos"
+                          className="flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-xs text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+                        >
+                          {isCopied ? (
+                            <>
+                              <Check className="h-3.5 w-3.5 text-green-600" />
+                              <span className="text-green-600">¡Copiado!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Clipboard className="h-3.5 w-3.5" />
+                              <span>Copiar</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
                       <p className="text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</p>
                     </div>
                   </td>
@@ -1682,6 +1735,7 @@ export default function GrupoPageClient({
               allGroupPredictions={allGroupPredictions}
               group={group}
               userId={userId}
+              leaderboard={leaderboard}
             />
           )}
           {activeTab === 'Historial' && (
