@@ -224,12 +224,26 @@ export default async function GrupoDetailPage({ params }: Props) {
       predUserMap[p.id] = p.user_id
     }
 
-    const { data: scoresRaw } = predIds.length > 0
-      ? await supabase.from('prediction_scores').select('prediction_id, pts_exact, pts_winner, pts_goal, pts_unique, pts_bonus, total').in('prediction_id', predIds)
-      : { data: [] }
+    // PostgREST uses GET with query params — batch to avoid URL length limits with many IDs
+    const CHUNK = 200
+    const scoresRaw: ScoreRow[] = []
+    if (predIds.length > 0) {
+      const chunks = Array.from({ length: Math.ceil(predIds.length / CHUNK) }, (_, i) =>
+        predIds.slice(i * CHUNK, i * CHUNK + CHUNK),
+      )
+      const results = await Promise.all(
+        chunks.map((chunk) =>
+          supabase
+            .from('prediction_scores')
+            .select('prediction_id, pts_exact, pts_winner, pts_goal, pts_unique, pts_bonus, total')
+            .in('prediction_id', chunk),
+        ),
+      )
+      for (const r of results) scoresRaw.push(...((r.data ?? []) as ScoreRow[]))
+    }
 
     const scoreByPredId: Record<string, ScoreRow> = {}
-    for (const s of (scoresRaw ?? []) as ScoreRow[]) {
+    for (const s of scoresRaw) {
       scoreByPredId[s.prediction_id] = s
     }
     allGroupPredictions = ((allPredsRaw ?? []) as {
@@ -252,7 +266,7 @@ export default async function GrupoDetailPage({ params }: Props) {
 
     const userTotals: Record<string, { pts_exact: number; pts_winner: number; pts_goal: number; pts_unique: number; pts_bonus: number; total: number }> = {}
 
-    for (const s of (scoresRaw ?? []) as ScoreRow[]) {
+    for (const s of scoresRaw) {
       const uid = predUserMap[s.prediction_id]
       if (!uid) continue
       if (!userTotals[uid]) {
