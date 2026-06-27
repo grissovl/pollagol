@@ -13,7 +13,7 @@ import {
   updateGroupRules, updateGroupPrizes, deleteGroup,
   acceptMembership, rejectMembership, removeMember,
   toggleMemberPayment, setGroupMatches, saveMatchResult,
-  updateOwnerPlays,
+  updateOwnerPlays, saveMatchTeams,
 } from '@/app/actions/grupo-detail'
 import { calcularPuntajes } from '@/app/actions/scoring'
 import JugarTab from './JugarTab'
@@ -713,11 +713,13 @@ function ParticipantesTab({
 // ── PartidosTab (admin) ───────────────────────────────────────────────────────
 
 function PartidosTab({
-  group, allMatches, rules,
+  group, allMatches, rules, allTeams, allPhaseResults,
 }: {
   group: GrupoData
   allMatches: MatchData[]
   rules: RulesData
+  allTeams: TeamBasic[]
+  allPhaseResults: PhaseResult[]
 }) {
   const router = useRouter()
   const [isPending, startTransition] = useTransition()
@@ -775,6 +777,34 @@ function PartidosTab({
   })
   const [matchMsgs, setMatchMsgs] = useState<Record<number, { ok?: boolean; text: string } | undefined>>({})
 
+  // Teams available per elimination phase (from phase_results of the previous phase)
+  const prevPhaseMap: Record<string, string> = {
+    r32: 'group', r16: 'r32', r8: 'r16', r4: 'r8', r2: 'r4', final: 'r4',
+  }
+  const teamsById = new Map(allTeams.map((t) => [t.id, t]))
+  const teamsForPhase = (phase: string): TeamBasic[] => {
+    const prev = prevPhaseMap[phase]
+    if (!prev) return []
+    const pr = allPhaseResults.find((r) => r.phase === prev)
+    if (!pr || pr.team_ids.length === 0) return []
+    return pr.team_ids.map((id) => teamsById.get(id)).filter(Boolean) as TeamBasic[]
+  }
+
+  // Elimination team assignment state
+  const elimMatches = allMatches.filter((m) => m.in_group && m.phase !== 'group')
+  const [showEquipos, setShowEquipos] = useState(elimMatches.length > 0)
+  const [teamSelections, setTeamSelections] = useState<Record<number, { home: string; away: string }>>(() => {
+    const init: Record<number, { home: string; away: string }> = {}
+    elimMatches.forEach((m) => {
+      init[m.id] = {
+        home: m.home_team_id != null ? String(m.home_team_id) : '',
+        away: m.away_team_id != null ? String(m.away_team_id) : '',
+      }
+    })
+    return init
+  })
+  const [teamMsgs, setTeamMsgs] = useState<Record<number, { ok?: boolean; text: string } | undefined>>({})
+
   const matchesByPhase = allMatches.reduce<Record<string, MatchData[]>>((acc, m) => {
     const k = m.phase
     if (!acc[k]) acc[k] = []
@@ -811,6 +841,22 @@ function PartidosTab({
         setMsg({ text: res.error })
       } else {
         setMsg({ ok: true, text: 'Partidos actualizados' })
+        router.refresh()
+      }
+    })
+  }
+
+  const handleSaveTeams = (matchId: number) => {
+    const sel = teamSelections[matchId]
+    const homeId = sel?.home ? parseInt(sel.home, 10) : null
+    const awayId = sel?.away ? parseInt(sel.away, 10) : null
+    setTeamMsgs((prev) => ({ ...prev, [matchId]: undefined }))
+    startTransition(async () => {
+      const res = await saveMatchTeams(group.id, matchId, homeId, awayId)
+      if (res.error) {
+        setTeamMsgs((prev) => ({ ...prev, [matchId]: { text: res.error! } }))
+      } else {
+        setTeamMsgs((prev) => ({ ...prev, [matchId]: { ok: true, text: 'Equipos guardados' } }))
         router.refresh()
       }
     })
@@ -1084,6 +1130,109 @@ function PartidosTab({
           </div>
         )}
       </div>
+
+      {/* ── Equipos de eliminatorias ── */}
+      {elimMatches.length > 0 && (
+        <div className="border-t border-gray-200 pt-6">
+          <button
+            type="button"
+            onClick={() => setShowEquipos((v) => !v)}
+            className="flex w-full items-center justify-between text-sm font-semibold text-gray-700 hover:text-gray-900"
+          >
+            <span>
+              Equipos de eliminatorias
+              <span className="ml-2 text-xs font-normal text-gray-500">
+                ({elimMatches.filter((m) => m.home_team_id != null && m.away_team_id != null).length} de {elimMatches.length} asignados)
+              </span>
+            </span>
+            <span className="text-gray-400">{showEquipos ? '▲' : '▼'}</span>
+          </button>
+
+          {showEquipos && (
+            <div className="mt-4 space-y-6">
+              {phaseOrder.filter((p) => p !== 'group').map((phase) => {
+                const phaseMatches = elimMatches.filter((m) => m.phase === phase)
+                if (phaseMatches.length === 0) return null
+                const availableTeams = teamsForPhase(phase)
+                return (
+                  <div key={phase}>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      {phaseLabels[phase] ?? phase}
+                    </p>
+                    {availableTeams.length === 0 ? (
+                      <p className="text-xs text-amber-600">
+                        Primero ingresa los clasificados de la fase anterior en el tab Clasificados.
+                      </p>
+                    ) : (
+                      <div className="space-y-3">
+                        {phaseMatches.map((match) => {
+                          const sel = teamSelections[match.id] ?? { home: '', away: '' }
+                          const tmsg = teamMsgs[match.id]
+                          return (
+                            <div key={match.id} className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm">
+                              <p className="mb-3 text-xs text-gray-400">{formatMatchDate(match.scheduled_at)}</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <select
+                                  value={sel.home}
+                                  onChange={(e) =>
+                                    setTeamSelections((prev) => ({
+                                      ...prev,
+                                      [match.id]: { ...prev[match.id], home: e.target.value },
+                                    }))
+                                  }
+                                  className="flex-1 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                                >
+                                  <option value="">Por definir</option>
+                                  {availableTeams.map((t) => (
+                                    <option key={t.id} value={String(t.id)}>
+                                      {t.flag_emoji ? `${t.flag_emoji} ` : ''}{t.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <span className="text-sm font-bold text-gray-400">vs</span>
+                                <select
+                                  value={sel.away}
+                                  onChange={(e) =>
+                                    setTeamSelections((prev) => ({
+                                      ...prev,
+                                      [match.id]: { ...prev[match.id], away: e.target.value },
+                                    }))
+                                  }
+                                  className="flex-1 rounded-lg border border-gray-300 bg-white px-2 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+                                >
+                                  <option value="">Por definir</option>
+                                  {availableTeams.map((t) => (
+                                    <option key={t.id} value={String(t.id)}>
+                                      {t.flag_emoji ? `${t.flag_emoji} ` : ''}{t.name}
+                                    </option>
+                                  ))}
+                                </select>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleSaveTeams(match.id)}
+                                  disabled={isPending}
+                                  className="shrink-0"
+                                >
+                                  Guardar
+                                </Button>
+                              </div>
+                              {tmsg && (
+                                <p className={`mt-2 text-xs ${tmsg.ok ? 'text-green-600' : 'text-red-600'}`}>
+                                  {tmsg.text}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Partidos del grupo ── */}
       <div className="border-t border-gray-200 pt-6">
@@ -1693,7 +1842,7 @@ export default function GrupoPageClient({
             <ParticipantesTab group={group} members={members} />
           )}
           {isOwner && activeTab === 'Partidos' && (
-            <PartidosTab group={group} allMatches={allMatches} rules={rules} />
+            <PartidosTab group={group} allMatches={allMatches} rules={rules} allTeams={allTeams} allPhaseResults={allPhaseResults} />
           )}
           {isOwner && activeTab === 'Predicciones únicas' && (
             <ApuestasTab

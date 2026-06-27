@@ -53,6 +53,8 @@ export type MatchData = {
   home_score: number | null
   away_score: number | null
   status: string
+  home_team_id: number | null
+  away_team_id: number | null
   home_team: { name: string; flag_emoji: string | null } | null
   away_team: { name: string; flag_emoji: string | null } | null
   in_group: boolean

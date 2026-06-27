@@ -238,6 +238,30 @@ export async function saveMatchResult(
   }
 }
 
+export async function saveMatchTeams(
+  groupId: string,
+  matchId: number,
+  homeTeamId: number | null,
+  awayTeamId: number | null,
+): Promise<{ error?: string }> {
+  try {
+    const { supabase } = await assertOwner(groupId)
+    const { data, error } = await supabase
+      .from('matches')
+      .update({ home_team_id: homeTeamId, away_team_id: awayTeamId })
+      .eq('id', matchId)
+      .select('id')
+    if (error) return { error: errMsg(error) }
+    if (!data || data.length === 0) {
+      return { error: 'No se pudo actualizar el partido. Verifica que existe la policy RLS "matches_update_admin" en Supabase.' }
+    }
+    revalidatePath(`/grupos/${groupId}`)
+    return {}
+  } catch (e) {
+    return { error: errMsg(e) }
+  }
+}
+
 export async function upsertSpecialBet(
   groupId: string,
   category: string,

@@ -155,6 +155,8 @@ export default async function GrupoDetailPage({ params }: Props) {
     home_score: m.home_score,
     away_score: m.away_score,
     status: m.status,
+    home_team_id: m.home_team_id != null ? Number(m.home_team_id) : null,
+    away_team_id: m.away_team_id != null ? Number(m.away_team_id) : null,
     home_team: m.home_team_id != null ? (teamsById[Number(m.home_team_id)] ?? null) : null,
     away_team: m.away_team_id != null ? (teamsById[Number(m.away_team_id)] ?? null) : null,
     in_group: groupMatchIdSet.has(Number(m.id)),
