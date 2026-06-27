@@ -1,5 +1,5 @@
 # PROJECT_LOG — PollaGol
-_Última actualización: 2026-06-26_
+_Última actualización: 2026-06-27_
 
 ## Estado actual
 - Auth: email + Google OAuth funcionando en producción
@@ -13,14 +13,17 @@ _Última actualización: 2026-06-26_
 - Vista participante: tabs Info, Jugar, Pronósticos, Historial, Clasificados, Predicciones únicas, Cómo se puntúa, Ranking
 - Historial: colores por puntaje (0=gris, 1-5=escala verdes, 10=dorado ⭐)
 - Pronósticos: botón copiar por partido (formato texto alineado)
+- Asignación manual de equipos en eliminatorias: sección "Equipos de eliminatorias" en tab Partidos (solo organizador), dropdowns filtrados por clasificados de la fase anterior (phase_results)
 - PWA: instalable iOS/Android, íconos personalizados
 - Deploy: pollagol-omega.vercel.app, Vercel + Supabase, 14 usuarios activos
 
-## Sesión anterior
-- Fix crítico: leaderboard mostraba 0 para todos — query superaba límite URL de Supabase con 827 IDs, fix con chunks de 200
-- Tabs Pronósticos e Historial implementados para participantes
-- Colapsar partidos con resultado en panel admin (tab Partidos)
-- Botón copiar pronósticos por partido en tab Pronósticos
+## Sesión anterior (2026-06-27)
+- Asignación manual de equipos en partidos de eliminatorias: nueva sección colapsable en tab Partidos del organizador
+  - Dropdowns muestran solo los equipos clasificados de la fase previa (phase_results), no los 48 equipos
+  - Si no hay clasificados registrados, muestra aviso para ir al tab Clasificados primero
+  - Acción `saveMatchTeams` con guard `assertOwner` — actualiza `matches.home_team_id/away_team_id`
+  - `MatchData` ahora incluye `home_team_id` y `away_team_id`
+- Fix: instalar paquete `flag-icons` que faltaba en node_modules
 
 ## Decisiones técnicas
 - Resultados de partidos de eliminatorias = marcador a 90/120 min, sin penales
@@ -28,11 +31,11 @@ _Última actualización: 2026-06-26_
 - Bonos de fase: opción B (selección cuando se conocen clasificados reales)
 - Server actions para todas las mutaciones, no API routes
 - Scripts: usar `npm run dev:clean` en Windows para evitar caché corrupta de .next
+- `matches` es tabla compartida entre grupos — asignar equipos en un partido lo actualiza globalmente (comportamiento correcto, el torneo es objetivo)
 
 ## Pendientes priorizados
-- [ ] Actualizar fixture 16avos: ingresar home_team_id/away_team_id cuando se cierren los grupos (27 jun)
-- [ ] Ingresar clasificados reales en tab Clasificados para habilitar bonos de 16avos
-- [ ] Generar SQL de 16avos con cruces oficiales (Gino pasa Excel con 1°/2° por grupo + mejores terceros)
+- [ ] Ingresar clasificados reales de grupos en tab Clasificados (habilita dropdowns de 16avos y bonos)
+- [ ] Asignar equipos a los partidos de r32 una vez cerrados los grupos (27 jun)
 
 ## Problemas conocidos
 - Ninguno activo
