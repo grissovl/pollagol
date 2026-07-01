@@ -23,7 +23,12 @@
       "Bash(curl -Ls -o /tmp/resp.txt -w \"%{http_code}\" http://localhost:3003/grupos/test-id)",
       "Read(//tmp/**)",
       "Bash(npm install *)",
-      "Bash(dir srcappgrupos *)"
+      "Bash(dir srcappgrupos *)",
+      "Bash(git -C /c/Users/gvloc/pollagol status)",
+      "Bash(git -C /c/Users/gvloc/pollagol diff)",
+      "Bash(git -C /c/Users/gvloc/pollagol add src/app/grupos/[id]/GrupoPageClient.tsx)",
+      "Bash(git -C /c/Users/gvloc/pollagol commit -m ' *)",
+      "Bash(git *)"
     ]
   }
 }

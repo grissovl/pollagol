@@ -60,22 +60,35 @@ export async function calcularPuntajes(
     )
     if (matchIds.length === 0) return { updated: 0 }
 
-    const [{ data: predsRaw, error: predsError }, { data: matchesRaw }] =
-      await Promise.all([
-        supabase
-          .from('predictions')
-          .select('id, user_id, match_id, home_score_pred, away_score_pred')
-          .eq('group_id', groupId)
-          .in('match_id', matchIds),
-        supabase
-          .from('matches')
-          .select('id, home_score, away_score')
-          .in('id', matchIds)
-          .not('home_score', 'is', null)
-          .not('away_score', 'is', null),
-      ])
+    const [predsRaw, { data: matchesRaw }] = await Promise.all([
+      (async () => {
+        const all: unknown[] = []
+        const PAGE = 1000
+        let from = 0
+        while (true) {
+          const { data, error } = await supabase
+            .from('predictions')
+            .select('id, user_id, match_id, home_score_pred, away_score_pred')
+            .eq('group_id', groupId)
+            .in('match_id', matchIds)
+            .range(from, from + PAGE - 1)
+          if (error) return { data: null, error }
+          if (data) all.push(...data)
+          if (!data || data.length < PAGE) break
+          from += PAGE
+        }
+        return { data: all, error: null }
+      })(),
+      supabase
+        .from('matches')
+        .select('id, home_score, away_score')
+        .in('id', matchIds)
+        .not('home_score', 'is', null)
+        .not('away_score', 'is', null),
+    ])
 
-    if (predsError) return { error: errMsg(predsError) }
+    if (predsRaw.error) return { error: errMsg(predsRaw.error) }
+    const predsData = predsRaw.data
 
     type MatchResult = { id: number; home_score: number; away_score: number }
     const matchResultMap: Record<number, MatchResult> = {}
@@ -91,7 +104,7 @@ export async function calcularPuntajes(
       away_score_pred: number | null
     }
 
-    const preds = (predsRaw ?? []) as PredRow[]
+    const preds = (predsData ?? []) as PredRow[]
     const predsWithResults = preds.filter((p) => matchResultMap[p.match_id] != null)
     if (predsWithResults.length === 0) return { updated: 0 }
 
