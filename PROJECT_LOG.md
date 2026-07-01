@@ -1,5 +1,5 @@
 # PROJECT_LOG — PollaGol
-_Última actualización: 2026-06-27_
+_Última actualización: 2026-07-01_
 
 ## Estado actual
 - Auth: email + Google OAuth funcionando en producción
@@ -9,6 +9,7 @@ _Última actualización: 2026-06-27_
 - Sistema de puntuación: marcador exacto, ganador, gol acertado, predicción única — recálculo manual desde panel admin
 - Bonos de fase eliminatoria: tablas phase_predictions y phase_results creadas, tab Clasificados implementado
 - Ranking: filtrado por paid=true, desempate ME→GA→GoA, fix chunks para evitar límite URL Supabase
+- Paginación Supabase: todas las queries masivas usan `.range()` en bloques de 1000 para superar el límite por defecto (afecta grupos con >1000 predicciones)
 - Panel admin: tabs Info, Configuración, Participantes, Partidos, Predicciones únicas, Clasificados, Jugar, Ranking
 - Vista participante: tabs Info, Jugar, Pronósticos, Historial, Clasificados, Predicciones únicas, Cómo se puntúa, Ranking
 - Historial: colores por puntaje (0=gris, 1-5=escala verdes, 10=dorado ⭐)
@@ -16,6 +17,13 @@ _Última actualización: 2026-06-27_
 - Asignación manual de equipos en eliminatorias: sección "Equipos de eliminatorias" en tab Partidos (solo organizador), dropdowns filtrados por clasificados de la fase anterior (phase_results)
 - PWA: instalable iOS/Android, íconos personalizados
 - Deploy: pollagol-omega.vercel.app, Vercel + Supabase, 14 usuarios activos
+
+## Sesión anterior (2026-07-01)
+- Fix límite 1000 filas Supabase en tres puntos críticos del grupo con 1079 predicciones:
+  - `calcularPuntajes` (`scoring.ts`): paginación con `.range()` en bloques de 1000 hasta agotar todas las predicciones
+  - `allPredsRaw` (`page.tsx`): misma paginación para la query que construye `allGroupPredictions` y el leaderboard
+  - `HistorialTab` (`GrupoPageClient.tsx`): no requería cambios — ya mostraba todo lo que recibía como prop; el problema era que el prop llegaba truncado
+- Supabase aplica límite de 1000 filas por defecto (sin `.limit()` explícito); solución: paginar con `.range(from, from+999)` en un while hasta que la respuesta tenga menos de 1000 filas
 
 ## Sesión anterior (2026-06-27)
 - Asignación manual de equipos en partidos de eliminatorias: nueva sección colapsable en tab Partidos del organizador
@@ -39,3 +47,4 @@ _Última actualización: 2026-06-27_
 
 ## Problemas conocidos
 - Ninguno activo
+- Nota: Supabase aplica límite implícito de 1000 filas en todas las queries REST. Cualquier query nueva sobre tablas que crezcan (predictions, prediction_scores) debe usar paginación con `.range()`.

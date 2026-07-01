@@ -215,10 +215,22 @@ export default async function GrupoDetailPage({ params }: Props) {
   let leaderboard: LeaderboardEntry[] = []
   let allGroupPredictions: AllPredictionData[] = []
   if (isAccepted || isOwner) {
-    const { data: allPredsRaw } = await supabase
-      .from('predictions')
-      .select('id, user_id, match_id, home_score_pred, away_score_pred')
-      .eq('group_id', params.id)
+    const allPredsRaw = await (async () => {
+      const all: { id: string; user_id: string; match_id: number; home_score_pred: number | null; away_score_pred: number | null }[] = []
+      const PAGE = 1000
+      let from = 0
+      while (true) {
+        const { data } = await supabase
+          .from('predictions')
+          .select('id, user_id, match_id, home_score_pred, away_score_pred')
+          .eq('group_id', params.id)
+          .range(from, from + PAGE - 1)
+        if (data) all.push(...(data as typeof all))
+        if (!data || data.length < PAGE) break
+        from += PAGE
+      }
+      return all
+    })()
 
     const predIds = ((allPredsRaw ?? []) as { id: string }[]).map((p) => p.id)
     const predUserMap: Record<string, string> = {}
